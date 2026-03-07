@@ -76,5 +76,15 @@
       <option name="name" value="maven7" />
       <option name="url" value="https://server.bbkr.space/artifactory/libs-release" />
     </remote-repository>
+    <remote-repository>
+      <option name="id" value="LoomLocalRemappedMods" />
+      <option name="name" value="LoomLocalRemappedMods" />
+      <option name="url" value="file:/$PROJECT_DIR$/../Unique%20Tiers%20and%20Attributes/.gradle/loom-cache/remapped_mods/" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="LoomLocalMinecraft" />
+      <option name="name" value="LoomLocalMinecraft" />
+      <option name="url" value="file:/$PROJECT_DIR$/../Unique%20Tiers%20and%20Attributes/.gradle/loom-cache/minecraftMaven/" />
+    </remote-repository>
   </component>
 </project>
