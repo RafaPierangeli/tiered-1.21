@@ -35,16 +35,16 @@ public class TieredConfig implements ConfigData {
     @ConfigEntry.Gui.Tooltip
     public boolean uniqueReforge = false;
 
-    @ConfigEntry.Category("client_settings")
-    public boolean showReforgingTab = true;
-    @ConfigEntry.Category("client_settings")
-    public int xIconPosition = 0;
-    @ConfigEntry.Category("client_settings")
-    public int yIconPosition = 0;
-    @ConfigEntry.Category("client_settings")
-    public boolean tieredTooltip = true;
-    @ConfigEntry.Category("client_settings")
-    public boolean centerName = true;
+//    @ConfigEntry.Category("client_settings")
+//    public boolean showReforgingTab = true;
+//    @ConfigEntry.Category("client_settings")
+//    public int xIconPosition = 0;
+//    @ConfigEntry.Category("client_settings")
+//    public int yIconPosition = 0;
+//    @ConfigEntry.Category("client_settings")
+//    public boolean tieredTooltip = true;
+//    @ConfigEntry.Category("client_settings")
+//    public boolean centerName = true;
 
     @ConfigEntry.Category("client_settings")
     @ConfigEntry.Gui.EnumHandler(option = ConfigEntry.Gui.EnumHandler.EnumDisplayOption.BUTTON)
