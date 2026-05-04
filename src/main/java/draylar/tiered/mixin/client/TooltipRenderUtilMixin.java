@@ -3,24 +3,24 @@ package draylar.tiered.mixin.client;
 import draylar.tiered.Tiered;
 import draylar.tiered.client.TooltipContextHolder;
 import draylar.tiered.config.ConfigInit;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.tooltip.TooltipRenderUtil;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
+import org.jetbrains.annotations.UnknownNullability;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-// TODO(Ravel): can not resolve target class TooltipBackgroundRenderer
+
 @Mixin(TooltipRenderUtil.class)
 public abstract class TooltipRenderUtilMixin {
 
-    // TODO(Ravel): no target class
-    @Inject(method = "renderTooltipBackground", at = @At("RETURN"))
-    private static void onRenderTooltipBackground(GuiGraphics context, int x, int y, int width, int height, Identifier texture, CallbackInfo ci) {
+
+    @Inject(method = "extractTooltipBackground", at = @At("RETURN"))
+    private static void onRenderTooltipBackground(GuiGraphicsExtractor graphics, int x, int y, int w, int h, Identifier style, CallbackInfo ci) {
 
         if (!ConfigInit.CONFIG.enableTierColorBorder && !ConfigInit.CONFIG.enableTierOrnaments) {
             return;
@@ -57,12 +57,12 @@ public abstract class TooltipRenderUtilMixin {
             }
 
             if (ConfigInit.CONFIG.enableTierColorBorder) {
-                drawSolidColorBorder(context, x, y, width, height, borderColor);
+                drawSolidColorBorder(graphics, x, y, w, h, borderColor);
             }
 
             if (ConfigInit.CONFIG.enableTierOrnaments) {
                 Identifier ornamentsTexture = Identifier.fromNamespaceAndPath("tiered", "textures/gui/tooltip_borders/" + baseRarity + ".png");
-                drawOrnaments(context, ornamentsTexture, x, y, width, height);
+                drawOrnaments(graphics, ornamentsTexture, x, y, w, h);
             }
         }
 
@@ -72,7 +72,7 @@ public abstract class TooltipRenderUtilMixin {
         TooltipContextHolder.currentStack = ItemStack.EMPTY;
     }
 
-    private static void drawSolidColorBorder(GuiGraphics context, int x, int y, int width, int height, int color) {
+    private static void drawSolidColorBorder(@UnknownNullability GuiGraphicsExtractor context, int x, int y, int width, int height, int color) {
         int expand = 3;
         context.fill(x - expand, y - expand, x + width + expand, y - expand + 1, color);
         context.fill(x - expand, y + height + expand - 1, x + width + expand, y + height + expand, color);
@@ -81,7 +81,7 @@ public abstract class TooltipRenderUtilMixin {
     }
 
     // 🌟 METODO 2: Os Ornamentos Flutuantes (Otimizado para PNG 64x32)
-    private static void drawOrnaments(GuiGraphics context, Identifier texture, int x, int y, int width, int height) {
+    private static void drawOrnaments(GuiGraphicsExtractor context, Identifier texture, int x, int y, int width, int height) {
         int texWidth = 64;  // Nova largura total da imagem
         int texHeight = 32; // Nova altura total da imagem
         int cornerSize = 16; // Tamanho de cada canto no PNG

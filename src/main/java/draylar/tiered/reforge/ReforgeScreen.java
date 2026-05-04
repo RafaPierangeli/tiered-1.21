@@ -2,8 +2,6 @@ package draylar.tiered.reforge;
 
 import java.text.DecimalFormat;
 import java.util.*;
-
-import com.mojang.blaze3d.systems.RenderSystem;
 import draylar.tiered.Tiered;
 import draylar.tiered.api.ModifierUtils;
 import draylar.tiered.api.TieredItemTags;
@@ -11,20 +9,18 @@ import draylar.tiered.config.ConfigInit;
 import draylar.tiered.network.TieredClientPacket;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.tags.ItemTags;
-import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.Holder;
-import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
@@ -117,9 +113,9 @@ public class ReforgeScreen extends AbstractContainerScreen<ReforgeScreenHandler>
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
-        super.render(context, mouseX, mouseY, delta);
-        this.renderTooltip(context, mouseX, mouseY);
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        super.extractRenderState(context, mouseX, mouseY, delta);
+        this.extractTooltip(context, mouseX, mouseY);
 
         // 🌟 DESENHA O SISTEMA DE SORTE E CHANCES (Chamada Nova)
         this.renderLuckAndChances(context, mouseX, mouseY);
@@ -182,7 +178,7 @@ public class ReforgeScreen extends AbstractContainerScreen<ReforgeScreenHandler>
                     if (ingredient.isEmpty() || !baseItems.contains(ingredient.getItem())) {
                         tooltip.add(Component.translatable("screen.tiered.reforge_ingredient").withStyle(ChatFormatting.RED));
                         for (Item item : baseItems) {
-                            tooltip.add(Component.literal(" - ").append(item.getName()).withStyle(ChatFormatting.GRAY));
+                            tooltip.add(Component.literal(" - ").append(item.getName(item.getDefaultInstance())).withStyle(ChatFormatting.GRAY));
                         }
                     }
                 }
@@ -248,7 +244,7 @@ public class ReforgeScreen extends AbstractContainerScreen<ReforgeScreenHandler>
 
             context.pose().pushMatrix();
 
-            context.drawCenteredString(this.font, this.floatingText, textX, textY, color);
+            context.centeredText(this.font, this.floatingText, textX, textY, color);
 
             context.pose().popMatrix();
         }
@@ -260,7 +256,7 @@ public class ReforgeScreen extends AbstractContainerScreen<ReforgeScreenHandler>
     // =================================================================
     // 🌟 O SISTEMA DE SORTE E TOOLTIP DINÂMICA (Sincronizado com o Servidor)
     // =================================================================
-    private void renderLuckAndChances(GuiGraphics context, int mouseX, int mouseY) {
+    private void renderLuckAndChances(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         if (this.minecraft == null || this.minecraft.player == null) return;
 
         double luck = this.minecraft.player.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.LUCK);
@@ -277,7 +273,7 @@ public class ReforgeScreen extends AbstractContainerScreen<ReforgeScreenHandler>
         context.pose().pushMatrix();
         context.pose().translate(textX, textY);
         context.pose().scale(scale, scale);
-        context.drawString(this.font, luckText, 0, 0, 0xFF55FF55, true);
+        context.text(this.font, luckText, 0, 0, 0xFF55FF55, true);
         context.pose().popMatrix();
 
         // Ajusta a área de colisão do mouse para o novo tamanho do texto
@@ -446,7 +442,7 @@ public class ReforgeScreen extends AbstractContainerScreen<ReforgeScreenHandler>
 
 
     @Override
-    protected void renderBg(GuiGraphics context, float delta, int mouseX, int mouseY) {
+    public void extractBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         int i = (this.width - this.imageWidth) / 2;
         int j = (this.height - this.imageHeight) / 2;
         context.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, i, j, 0, 0, this.imageWidth, this.imageHeight, this.imageWidth, this.imageHeight);
@@ -465,7 +461,7 @@ public class ReforgeScreen extends AbstractContainerScreen<ReforgeScreenHandler>
 
 
 @Override
-protected void renderContents(GuiGraphics context, int mouseX, int mouseY, float deltaTicks) {
+protected void extractContents(GuiGraphicsExtractor context, int mouseX, int mouseY, float deltaTicks) {
             int u = 0; // Posição X na imagem (sempre 0, pois a imagem tem 20px de largura)
             int v = 0; // Posição Y na imagem (muda dependendo do estado)
 
@@ -483,8 +479,6 @@ protected void renderContents(GuiGraphics context, int mouseX, int mouseY, float
             this.disabled = disable;
             this.active = !disable;
         }
-
-
     }
 
 

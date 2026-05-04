@@ -1,19 +1,17 @@
 package draylar.tiered.block;
 
 import draylar.tiered.Tiered;
-import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
+import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.*;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
-import net.minecraft.world.item.CreativeModeTabs;
-import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
-import net.minecraft.world.level.material.MapColor;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.CreativeModeTabs;
 
 
 public class BlockRegisters {
@@ -28,10 +26,11 @@ public class BlockRegisters {
     );
 
 
+
     public static void registerModBlocks() {
         Registry.register(BuiltInRegistries.BLOCK, Identifier.fromNamespaceAndPath(Tiered.MOD_ID, "reforge_block"), REFORGE_BLOCK);
 
-        ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.FUNCTIONAL_BLOCKS)
+        CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.FUNCTIONAL_BLOCKS)
                 .register(entries -> entries.accept(REFORGE_BLOCK));
 
 

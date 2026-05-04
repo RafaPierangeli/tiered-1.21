@@ -8,7 +8,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-
 import draylar.tiered.api.ModifierUtils;
 import draylar.tiered.config.ConfigInit;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -43,8 +42,8 @@ public abstract class ArmorStandMixin {
         }
     }
 
-    @Inject(method = "interactAt", at = @At("HEAD"))
-    private void interactAt(Player player, Vec3 hitPos, InteractionHand hand, CallbackInfoReturnable<InteractionResult> info) {
+    @Inject(method = "interact", at = @At("HEAD"))
+    private void interactAt(Player player, InteractionHand hand, Vec3 location, CallbackInfoReturnable<InteractionResult> cir) {
         this.isGenerated = false;
         this.isClient = player.level().isClientSide();
     }

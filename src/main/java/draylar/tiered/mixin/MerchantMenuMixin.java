@@ -13,15 +13,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-
 import draylar.tiered.api.ModifierUtils;
 import draylar.tiered.config.ConfigInit;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.inventory.MerchantMenu;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.MenuType;
 
-// TODO(Ravel): can not resolve target class MerchantScreenHandler
 @Mixin(MerchantMenu.class)
 public abstract class MerchantMenuMixin  {
 
@@ -48,13 +44,13 @@ public abstract class MerchantMenuMixin  {
     }
 
 
-    @ModifyVariable(method = "quickMoveStack", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/inventory/MerchantMenu;moveItemStackTo(Lnet/minecraft/world/item/ItemStack;IIZ)Z", ordinal = 0), ordinal = 1)
-    private ItemStack quickMoveMixin(ItemStack original) {
+    @ModifyVariable(method = "quickMoveStack", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/inventory/MerchantMenu;moveItemStackTo(Lnet/minecraft/world/item/ItemStack;IIZ)Z", ordinal = 0), name = "stack")
+    private ItemStack quickMoveMixin(ItemStack stack) {
 
         if (this.tiered$currentPlayer instanceof ServerPlayer serverPlayer) {
 
             // 🌟 PASSO 1: O LIMPA-TRILHOS (Sempre executa)
-            ModifierUtils.removeItemStackAttribute(original);
+            ModifierUtils.removeItemStackAttribute(stack);
 
             // 🌟 PASSO 2: APLICAÇÃO (Só executa se a config principal estiver ligada)
             if (ConfigInit.CONFIG.merchantModifier) {
@@ -64,9 +60,9 @@ public abstract class MerchantMenuMixin  {
                     merchantLevel = villager.getVillagerData().level();
                 }
 
-                ModifierUtils.setItemStackAttribute(serverPlayer, original, false, merchantLevel);
+                ModifierUtils.setItemStackAttribute(serverPlayer, stack, false, merchantLevel);
             }
         }
-        return original;
+        return stack;
     }
 }

@@ -114,7 +114,7 @@ public class ReforgeScreenHandler extends AbstractContainerMenu {
                 } else {
                     var repairable = stack.get(DataComponents.REPAIRABLE);
                     if (repairable != null && repairable.items() != null) {
-                        isReady = repairable.items().contains(baseItem.getItemHolder());
+                        isReady = repairable.items().contains(baseItem.typeHolder());
                     } else {
                         isReady = baseItem.is(TieredItemTags.REFORGE_BASE_ITEM);
                     }
@@ -191,7 +191,7 @@ public class ReforgeScreenHandler extends AbstractContainerMenu {
                     Item targetItem = targetStack.getItem();
 
                     var repairable = targetStack.get(DataComponents.REPAIRABLE);
-                    if (repairable != null && repairable.items() != null && repairable.items().contains(itemStack.getItemHolder())) {
+                    if (repairable != null && repairable.items() != null && repairable.items().contains(itemStack.typeHolder())) {
                         if (!this.moveItemStackTo(itemStack2, 0, 1, false)) {
                             return ItemStack.EMPTY;
                         }

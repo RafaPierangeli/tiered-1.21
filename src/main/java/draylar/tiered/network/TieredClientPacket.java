@@ -18,6 +18,7 @@ import draylar.tiered.reforge.ReforgeScreen;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.world.item.Item;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -27,6 +28,13 @@ public class TieredClientPacket {
 
     @SuppressWarnings("resource")
     public static void init() {
+
+        PayloadTypeRegistry.clientboundPlay().register(ReforgeReadyPacket.PACKET_ID, ReforgeReadyPacket.PACKET_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(HealthPacket.PACKET_ID, HealthPacket.PACKET_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(ReforgeItemSyncPacket.PACKET_ID, ReforgeItemSyncPacket.PACKET_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(AttributePacket.PACKET_ID, AttributePacket.PACKET_CODEC);
+
+
         ClientPlayNetworking.registerGlobalReceiver(ReforgeReadyPacket.PACKET_ID, (payload, context) -> {
             boolean disableButton = payload.disableButton();
             context.client().execute(() -> {

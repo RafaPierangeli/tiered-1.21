@@ -24,13 +24,13 @@ public class TieredServerPacket {
 
     public static void init() {
         // Registra os pacotes de sincronização de dados
-        PayloadTypeRegistry.playS2C().register(AttributePacket.PACKET_ID, AttributePacket.PACKET_CODEC);
-        PayloadTypeRegistry.playS2C().register(HealthPacket.PACKET_ID, HealthPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playS2C().register(ReforgeReadyPacket.PACKET_ID, ReforgeReadyPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playS2C().register(ReforgeItemSyncPacket.PACKET_ID, ReforgeItemSyncPacket.PACKET_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(AttributePacket.PACKET_ID, AttributePacket.PACKET_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(HealthPacket.PACKET_ID, HealthPacket.PACKET_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ReforgeReadyPacket.PACKET_ID, ReforgeReadyPacket.PACKET_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ReforgeItemSyncPacket.PACKET_ID, ReforgeItemSyncPacket.PACKET_CODEC);
 
         // Registra o pacote do botão "Reforjar"
-        PayloadTypeRegistry.playC2S().register(ReforgePacket.PACKET_ID, ReforgePacket.PACKET_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ReforgePacket.PACKET_ID, ReforgePacket.PACKET_CODEC);
 
         // 🌟 O ÚNICO RECEBEDOR NECESSÁRIO AGORA: O clique no botão de Reforjar!
         ServerPlayNetworking.registerGlobalReceiver(ReforgePacket.PACKET_ID, (payload, context) -> {
