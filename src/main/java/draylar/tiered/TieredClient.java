@@ -7,8 +7,8 @@ import draylar.tiered.reforge.ReforgeScreenHandler;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.gui.screen.ingame.HandledScreens;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.screens.MenuScreens;
+import net.minecraft.resources.Identifier;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -22,7 +22,7 @@ public class TieredClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        HandledScreens.<ReforgeScreenHandler, ReforgeScreen>register(Tiered.REFORGE_SCREEN_HANDLER_TYPE, ReforgeScreen::new);
+        MenuScreens.<ReforgeScreenHandler, ReforgeScreen>register(Tiered.REFORGE_SCREEN_HANDLER_TYPE, ReforgeScreen::new);
         TieredClientPacket.init();
         draylar.tiered.client.TieredTooltipCallback.register();
     }

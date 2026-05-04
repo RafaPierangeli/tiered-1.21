@@ -5,18 +5,18 @@
   "mixins": [
 
     "LivingEntityMixin",
-    "TradeOutputSlotMixin",
-    "PlayerEntityMixin",
+    "MerchantResultSlotMixin",
+    "PlayerMixin",
     "ItemMixin",
-    "TridentEntityMixin",
+    "ThrownTridentMixin",
     "LootTableMixin",
-    "MerchantScreenHandlerMixin",
+    "MerchantMenuMixin",
     "RangedWeaponItemMixin",
-    "ItemFrameEntityMixin",
-    "MobEntityMixin",
-    "ArmorStandEntityMixin",
-    "CraftingScreenHandlerMixin",
-    "access.ServerPlayerEntityAccessor"
+    "ItemFrameMixin",
+    "MobMixin",
+    "ArmorStandMixin",
+    "CraftingMenuMixin",
+    "access.ServerPlayerAccessor"
   ],
   "client": [
     "client.ItemStackClientMixin"

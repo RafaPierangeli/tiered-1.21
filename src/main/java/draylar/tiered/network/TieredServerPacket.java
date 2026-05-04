@@ -16,9 +16,9 @@ import draylar.tiered.network.packet.ReforgeReadyPacket;
 import draylar.tiered.reforge.ReforgeScreenHandler;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.resources.Identifier;
 
 public class TieredServerPacket {
 
@@ -35,18 +35,18 @@ public class TieredServerPacket {
         // 🌟 O ÚNICO RECEBEDOR NECESSÁRIO AGORA: O clique no botão de Reforjar!
         ServerPlayNetworking.registerGlobalReceiver(ReforgePacket.PACKET_ID, (payload, context) -> {
             context.server().execute(() -> {
-                if (context.player().currentScreenHandler instanceof ReforgeScreenHandler reforgeScreenHandler) {
+                if (context.player().containerMenu instanceof ReforgeScreenHandler reforgeScreenHandler) {
                     reforgeScreenHandler.reforge();
                 }
             });
         });
     }
 
-    public static void writeS2CHealthPacket(ServerPlayerEntity serverPlayerEntity) {
+    public static void writeS2CHealthPacket(ServerPlayer serverPlayerEntity) {
         ServerPlayNetworking.send(serverPlayerEntity, new HealthPacket(serverPlayerEntity.getHealth()));
     }
 
-    public static void writeS2CReforgeItemSyncPacket(ServerPlayerEntity serverPlayerEntity) {
+    public static void writeS2CReforgeItemSyncPacket(ServerPlayer serverPlayerEntity) {
         List<Identifier> ids = new ArrayList<Identifier>();
         List<Integer> listSize = new ArrayList<Integer>();
         List<Integer> itemIds = new ArrayList<Integer>();
@@ -55,8 +55,8 @@ public class TieredServerPacket {
             ids.add(id);
 
             List<Integer> list = new ArrayList<Integer>();
-            Tiered.REFORGE_DATA_LOADER.getReforgeBaseItems(Registries.ITEM.get(id)).forEach(item -> {
-                list.add(Registries.ITEM.getRawId(item));
+            Tiered.REFORGE_DATA_LOADER.getReforgeBaseItems(BuiltInRegistries.ITEM.getValue(id)).forEach(item -> {
+                list.add(BuiltInRegistries.ITEM.getId(item));
             });
             listSize.add(list.size());
 
@@ -68,7 +68,7 @@ public class TieredServerPacket {
         ServerPlayNetworking.send(serverPlayerEntity, new ReforgeItemSyncPacket(ids, listSize, itemIds));
     }
 
-    public static void writeS2CAttributePacket(ServerPlayerEntity serverPlayerEntity) {
+    public static void writeS2CAttributePacket(ServerPlayer serverPlayerEntity) {
         List<String> attributeIds = new ArrayList<String>();
         List<String> attributeJsons = new ArrayList<String>();
 

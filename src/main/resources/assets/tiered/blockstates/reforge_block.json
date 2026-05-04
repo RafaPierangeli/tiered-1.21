@@ -1,9 +1,8 @@
-
 {
   "variants": {
-    "facing=north": { "model": "tiered:block/reforge_block", "y": 90 },
-    "facing=south": { "model": "tiered:block/reforge_block", "y": 270 },
-    "facing=west":  { "model": "tiered:block/reforge_block", "y": 0 },
-    "facing=east":  { "model": "tiered:block/reforge_block", "y": 180 }
+    "facing=north": { "model": "tiered:block/reforge_block", "y": 0},
+    "facing=south": { "model": "tiered:block/reforge_block", "y": 180 },
+    "facing=west":  { "model": "tiered:block/reforge_block", "y": 270 },
+    "facing=east":  { "model": "tiered:block/reforge_block", "y": 90 }
   }
 }

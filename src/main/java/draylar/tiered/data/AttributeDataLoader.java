@@ -5,10 +5,13 @@ import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
 import draylar.tiered.api.PotentialAttribute;
 import draylar.tiered.config.ConfigInit; // 🌟 Não esqueça de importar a sua config!
-import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
-import net.minecraft.resource.Resource;
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.util.Identifier;
+import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
+import net.minecraft.util.profiling.ProfilerFiller;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,23 +21,23 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-public class AttributeDataLoader implements SimpleSynchronousResourceReloadListener {
+public class AttributeDataLoader extends SimplePreparableReloadListener implements IdentifiableResourceReloadListener {
     private static final Logger LOGGER = LoggerFactory.getLogger(AttributeDataLoader.class);
     private static final String DATA_TYPE = "item_attributes";
 
     private Map<Identifier, PotentialAttribute> itemAttributes = new HashMap<>();
 
     @Override
-    public Identifier getFabricId() {
-        return Identifier.of("tiered", "item_attributes");
+    public @NonNull Identifier getFabricId() {
+        return Identifier.fromNamespaceAndPath("tiered", "item_attributes");
     }
 
     @Override
-    public void reload(ResourceManager manager) {
+    public Object prepare(ResourceManager resourceManager, @NonNull ProfilerFiller profilerFiller) {
         Map<Identifier, PotentialAttribute> readItemAttributes = new HashMap<>();
 
         // Encontra todos os arquivos .json dentro de data/<namespace>/item_attributes/
-        Map<Identifier, Resource> resources = manager.findResources(DATA_TYPE, id -> id.getPath().endsWith(".json"));
+        Map<Identifier, Resource> resources = resourceManager.listResources(DATA_TYPE, id -> id.getPath().endsWith(".json"));
 
         for (Map.Entry<Identifier, Resource> entry : resources.entrySet()) {
             Identifier fileId = entry.getKey();
@@ -47,9 +50,9 @@ public class AttributeDataLoader implements SimpleSynchronousResourceReloadListe
 
             String path = fileId.getPath();
             String attributeName = path.substring(DATA_TYPE.length() + 1, path.length() - 5);
-            Identifier attributeId = Identifier.of(fileId.getNamespace(), attributeName);
+            Identifier attributeId = Identifier.fromNamespaceAndPath(fileId.getNamespace(), attributeName);
 
-            try (Reader reader = new InputStreamReader(entry.getValue().getInputStream(), StandardCharsets.UTF_8)) {
+            try (Reader reader = new InputStreamReader(entry.getValue().open(), StandardCharsets.UTF_8)) {
                 JsonElement jsonElement = JsonParser.parseReader(reader);
 
                 PotentialAttribute attribute = PotentialAttribute.CODEC.parse(JsonOps.INSTANCE, jsonElement)
@@ -73,9 +76,17 @@ public class AttributeDataLoader implements SimpleSynchronousResourceReloadListe
 
         this.itemAttributes = readItemAttributes;
         LOGGER.info("Carregados {} tiers de atributos", readItemAttributes.size());
+        return null;
     }
 
     public Map<Identifier, PotentialAttribute> getItemAttributes() {
         return itemAttributes;
     }
+
+
+    @Override
+    public void apply(Object object, @NonNull ResourceManager resourceManager, @NonNull ProfilerFiller profilerFiller) {
+
+    }
+
 }

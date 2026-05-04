@@ -1,20 +1,23 @@
 package draylar.tiered.network.packet;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.NonNull;
 
-public record HealthPacket(float health) implements CustomPayload {
+public record HealthPacket(float health) implements CustomPacketPayload {
 
-    public static final CustomPayload.Id<HealthPacket> PACKET_ID = new CustomPayload.Id<>(Identifier.of("tiered", "health_packet"));
+    public static final CustomPacketPayload.Type<HealthPacket> PACKET_ID = new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath("tiered", "health_packet"));
 
-    public static final PacketCodec<RegistryByteBuf, HealthPacket> PACKET_CODEC = PacketCodec.of((value, buf) -> {
-        buf.writeFloat(value.health);
-    }, buf -> new HealthPacket(buf.readFloat()));
+    public static final StreamCodec<RegistryFriendlyByteBuf, HealthPacket> PACKET_CODEC =
+            StreamCodec.of(
+                    (buf, value) -> buf.writeFloat(value.health),
+                    buf -> new HealthPacket(buf.readFloat())
+            );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public @NonNull Type<? extends CustomPacketPayload> type() {
         return PACKET_ID;
     }
 

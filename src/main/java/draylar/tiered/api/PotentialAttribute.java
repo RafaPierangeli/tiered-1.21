@@ -1,11 +1,12 @@
+// TODO(Ravel): Failed to fully resolve file: null cannot be cast to non-null type com.intellij.psi.PsiClass
 package draylar.tiered.api;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.attribute.EntityAttributeModifier;
-import net.minecraft.text.Style;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.network.chat.Style;
+import net.minecraft.resources.Identifier;
 
 import java.util.List;
 import java.util.Optional;
@@ -16,7 +17,7 @@ public class PotentialAttribute {
             Codec.STRING.optionalFieldOf("id", "").forGetter(PotentialAttribute::getID),
             ItemVerifier.CODEC.listOf().fieldOf("verifiers").forGetter(PotentialAttribute::getVerifiers),
             Codec.INT.optionalFieldOf("weight", 1).forGetter(PotentialAttribute::getWeight),
-            Style.Codecs.CODEC.optionalFieldOf("style", Style.EMPTY).forGetter(PotentialAttribute::getStyle),
+            Style.Serializer.CODEC.optionalFieldOf("style", Style.EMPTY).forGetter(PotentialAttribute::getStyle),
 
             AttributeTemplate.CODEC.listOf().optionalFieldOf("attributes", List.of()).forGetter(PotentialAttribute::getAttributes),
 
@@ -75,14 +76,14 @@ public class PotentialAttribute {
     }
 
     // 🌟 A MÁGICA DO AMOUNT: Adicionamos o campo 'amount' como Optional<Double>
-    public record AttributeRoll(Identifier type, Optional<Double> amount, double min, double max, EntityAttributeModifier.Operation operation,
+    public record AttributeRoll(Identifier type, Optional<Double> amount, double min, double max, AttributeModifier.Operation operation,
                                 List<EquipmentSlot> requiredEquipmentSlots, List<EquipmentSlot> optionalEquipmentSlots) {
         public static final Codec<AttributeRoll> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Identifier.CODEC.fieldOf("type").forGetter(AttributeRoll::type),
                 Codec.DOUBLE.optionalFieldOf("amount").forGetter(AttributeRoll::amount), // Novo campo!
                 Codec.DOUBLE.optionalFieldOf("min", 0.0).forGetter(AttributeRoll::min),
                 Codec.DOUBLE.optionalFieldOf("max", 0.0).forGetter(AttributeRoll::max),
-                EntityAttributeModifier.Operation.CODEC.optionalFieldOf("operation", EntityAttributeModifier.Operation.ADD_VALUE).forGetter(AttributeRoll::operation),
+                AttributeModifier.Operation.CODEC.optionalFieldOf("operation", AttributeModifier.Operation.ADD_VALUE).forGetter(AttributeRoll::operation),
                 EquipmentSlot.CODEC.listOf().optionalFieldOf("required_equipment_slots", List.of()).forGetter(AttributeRoll::requiredEquipmentSlots),
                 EquipmentSlot.CODEC.listOf().optionalFieldOf("optional_equipment_slots", List.of()).forGetter(AttributeRoll::optionalEquipmentSlots)
         ).apply(instance, AttributeRoll::new));

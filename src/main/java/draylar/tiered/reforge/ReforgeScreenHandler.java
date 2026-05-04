@@ -1,66 +1,68 @@
 package draylar.tiered.reforge;
 
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.inventory.Inventory;
-import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.PropertyDelegate;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.ScreenHandlerContext;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.WorldEvents;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.resources.Identifier;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.Container;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.inventory.*;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.BlockPos;
 
 import draylar.tiered.Tiered;
 import draylar.tiered.api.ModifierUtils;
 import draylar.tiered.api.TieredItemTags;
 import draylar.tiered.config.ConfigInit;
+import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 
-public class ReforgeScreenHandler extends ScreenHandler {
+public class ReforgeScreenHandler extends AbstractContainerMenu {
 
-    private final Inventory inventory = new SimpleInventory(3) {
+    private final Container inventory = new SimpleContainer(3) {
         @Override
-        public void markDirty() {
-            super.markDirty();
-            ReforgeScreenHandler.this.onContentChanged(this);
+        public void setChanged() {
+            super.setChanged();
+            ReforgeScreenHandler.this.slotsChanged(this);
         }
     };
 
-    private final ScreenHandlerContext context;
-    private final PlayerEntity player;
+    private final ContainerLevelAccess context;
+    private final Player player;
     private BlockPos pos;
 
     // 🌟 NOVO: Sistema nativo para sincronizar o botão (substitui o pacote antigo)
-    private final PropertyDelegate propertyDelegate;
+    private final ContainerData propertyDelegate;
 
     // 🌟 NOVO: Construtor do Cliente (Necessário para a 1.21.11)
-    public ReforgeScreenHandler(int syncId, PlayerInventory playerInventory) {
-        this(syncId, playerInventory, ScreenHandlerContext.EMPTY);
-    }
+//    public ReforgeScreenHandler(int syncId, Inventory playerInventory) {
+//        this(syncId, playerInventory, ContainerLevelAccess.NULL);
+//    }
 
     // Construtor do Servidor
-    public ReforgeScreenHandler(int syncId, PlayerInventory playerInventory, ScreenHandlerContext context) {
+    public ReforgeScreenHandler(int syncId, Inventory playerInventory, ContainerLevelAccess context) {
         super(Tiered.REFORGE_SCREEN_HANDLER_TYPE, syncId);
 
         this.context = context;
         this.player = playerInventory.player;
 
         // Inicializa o sincronizador do botão
-        this.propertyDelegate = new PropertyDelegate() {
+        this.propertyDelegate = new ContainerData() {
             private int value = 0;
             @Override
             public int get(int index) { return value; }
             @Override
             public void set(int index, int value) { this.value = value; }
             @Override
-            public int size() { return 1; }
+            public int getCount() {
+                return 1;
+            }
         };
-        this.addProperties(this.propertyDelegate);
+        this.addDataSlots(this.propertyDelegate);
 
         // 🌟 MANTIVE SUAS COORDENADAS EM "V" AQUI!
         // Slot 0: Ingrediente Base (Esquerda)
@@ -70,8 +72,8 @@ public class ReforgeScreenHandler extends ScreenHandler {
         // Slot 2: Adição (Direita)
         this.addSlot(new Slot(this.inventory, 2, 115, 47) {
             @Override
-            public boolean canInsert(ItemStack stack) {
-                return stack.isIn(TieredItemTags.REFORGE_ADDITION);
+            public boolean mayPlace(@NonNull ItemStack stack) {
+                return stack.is(TieredItemTags.REFORGE_ADDITION);
             }
         });
 
@@ -84,37 +86,37 @@ public class ReforgeScreenHandler extends ScreenHandler {
         for (i = 0; i < 9; ++i) {
             this.addSlot(new Slot(playerInventory, i, 8 + i * 18, 142));
         }
-        this.context.run((world, pos) -> {
+        this.context.execute((world, pos) -> {
             ReforgeScreenHandler.this.setPos(pos);
         });
     }
 
     @Override
-    public void onContentChanged(Inventory inventory) {
-        super.onContentChanged(inventory);
-        if (inventory == this.inventory) {
+    public void slotsChanged(@NonNull Container container) {
+        super.slotsChanged(container);
+        if (container == this.inventory) {
             this.updateResult();
         }
     }
 
     private void updateResult() {
         boolean isReady = false;
-        ItemStack stack = this.getSlot(1).getStack();
+        ItemStack stack = this.getSlot(1).getItem();
 
-        if (this.getSlot(0).hasStack() && this.getSlot(1).hasStack() && this.getSlot(2).hasStack()) {
+        if (this.getSlot(0).hasItem() && this.getSlot(1).hasItem() && this.getSlot(2).hasItem()) {
             Item item = stack.getItem();
-            if (!stack.isIn(TieredItemTags.MODIFIER_RESTRICTED) && ModifierUtils.getRandomAttributeIDFor(null, item, false) != null && !stack.isDamaged()) {
+            if (!stack.is(TieredItemTags.MODIFIER_RESTRICTED) && ModifierUtils.getRandomAttributeIDFor(null, item, false) != null && !stack.isDamaged()) {
                 List<Item> items = Tiered.REFORGE_DATA_LOADER.getReforgeBaseItems(item);
-                ItemStack baseItem = this.getSlot(0).getStack();
+                ItemStack baseItem = this.getSlot(0).getItem();
 
                 if (!items.isEmpty()) {
                     isReady = items.stream().anyMatch(it -> it == baseItem.getItem());
                 } else {
-                    var repairable = stack.get(DataComponentTypes.REPAIRABLE);
+                    var repairable = stack.get(DataComponents.REPAIRABLE);
                     if (repairable != null && repairable.items() != null) {
-                        isReady = repairable.items().contains(baseItem.getRegistryEntry());
+                        isReady = repairable.items().contains(baseItem.getItemHolder());
                     } else {
-                        isReady = baseItem.isIn(TieredItemTags.REFORGE_BASE_ITEM);
+                        isReady = baseItem.is(TieredItemTags.REFORGE_BASE_ITEM);
                     }
                 }
             }
@@ -145,84 +147,89 @@ public class ReforgeScreenHandler extends ScreenHandler {
     }
 
     @Override
-    public void onClosed(PlayerEntity player) {
-        super.onClosed(player);
-        this.context.run((world, pos) -> this.dropInventory(player, this.inventory));
+    public void removed(@NonNull Player player) {
+        super.removed(player);
+        this.context.execute((world, pos) -> this.clearContainer(player, this.inventory));
     }
 
     @Override
-    public boolean canUse(PlayerEntity player) {
-        return this.context.get((world, pos) -> {
-            return player.squaredDistanceTo((double) pos.getX() + 0.5, (double) pos.getY() + 0.5, (double) pos.getZ() + 0.5) <= 64.0;
+    public boolean stillValid(@NonNull Player player) {
+        return this.context.evaluate((world, pos) -> {
+            return player.distanceToSqr((double) pos.getX() + 0.5, (double) pos.getY() + 0.5, (double) pos.getZ() + 0.5) <= 64.0;
         }, true);
     }
 
+//    @Override
+//    public boolean stillValid(Player player) {
+//        return true;
+//    }
+
     @Override
-    public ItemStack quickMove(PlayerEntity player, int index) {
+    public @NonNull ItemStack quickMoveStack(Player player, int index) {
         ItemStack itemStack = ItemStack.EMPTY;
         Slot slot = (Slot) this.slots.get(index);
-        if (slot != null && slot.hasStack()) {
-            ItemStack itemStack2 = slot.getStack();
+        if (slot != null && slot.hasItem()) {
+            ItemStack itemStack2 = slot.getItem();
             itemStack = itemStack2.copy();
 
             if (index == 1) {
-                if (!this.insertItem(itemStack2, 3, 39, true)) {
+                if (!this.moveItemStackTo(itemStack2, 3, 39, true)) {
                     return ItemStack.EMPTY;
                 }
-                slot.onQuickTransfer(itemStack2, itemStack);
+                slot.onQuickCraft(itemStack2, itemStack);
             } else if (index == 0 || index == 2) {
-                if (!this.insertItem(itemStack2, 3, 39, false)) {
+                if (!this.moveItemStackTo(itemStack2, 3, 39, false)) {
                     return ItemStack.EMPTY;
                 }
             } else if (index >= 3 && index < 39) {
-                if (itemStack.isIn(TieredItemTags.REFORGE_ADDITION) && !this.insertItem(itemStack2, 2, 3, false)) {
+                if (itemStack.is(TieredItemTags.REFORGE_ADDITION) && !this.moveItemStackTo(itemStack2, 2, 3, false)) {
                     return ItemStack.EMPTY;
                 }
 
-                if (this.getSlot(1).hasStack()) {
-                    ItemStack targetStack = this.getSlot(1).getStack();
+                if (this.getSlot(1).hasItem()) {
+                    ItemStack targetStack = this.getSlot(1).getItem();
                     Item targetItem = targetStack.getItem();
 
-                    var repairable = targetStack.get(DataComponentTypes.REPAIRABLE);
-                    if (repairable != null && repairable.items() != null && repairable.items().contains(itemStack.getRegistryEntry())) {
-                        if (!this.insertItem(itemStack2, 0, 1, false)) {
+                    var repairable = targetStack.get(DataComponents.REPAIRABLE);
+                    if (repairable != null && repairable.items() != null && repairable.items().contains(itemStack.getItemHolder())) {
+                        if (!this.moveItemStackTo(itemStack2, 0, 1, false)) {
                             return ItemStack.EMPTY;
                         }
-                    } else if (itemStack.isIn(TieredItemTags.REFORGE_BASE_ITEM) && !this.insertItem(itemStack2, 0, 1, false)) {
+                    } else if (itemStack.is(TieredItemTags.REFORGE_BASE_ITEM) && !this.moveItemStackTo(itemStack2, 0, 1, false)) {
                         return ItemStack.EMPTY;
                     }
 
                     List<Item> items = Tiered.REFORGE_DATA_LOADER.getReforgeBaseItems(targetItem);
-                    if (items.stream().anyMatch(it -> it == itemStack2.copy().getItem()) && !this.insertItem(itemStack2, 0, 1, false)) {
+                    if (items.stream().anyMatch(it -> it == itemStack2.copy().getItem()) && !this.moveItemStackTo(itemStack2, 0, 1, false)) {
                         return ItemStack.EMPTY;
                     }
                 }
 
-                if (ModifierUtils.getRandomAttributeIDFor(null, itemStack.getItem(), false) != null && !this.insertItem(itemStack2, 1, 2, false)) {
+                if (ModifierUtils.getRandomAttributeIDFor(null, itemStack.getItem(), false) != null && !this.moveItemStackTo(itemStack2, 1, 2, false)) {
                     return ItemStack.EMPTY;
                 }
             }
 
             if (itemStack2.isEmpty()) {
-                slot.setStack(ItemStack.EMPTY);
+                slot.set(ItemStack.EMPTY);
             } else {
-                slot.markDirty();
+                slot.setChanged();
             }
 
             if (itemStack2.getCount() == itemStack.getCount()) {
                 return ItemStack.EMPTY;
             }
-            slot.onTakeItem(player, itemStack2);
+            slot.onTake(player, itemStack2);
         }
         return itemStack;
     }
 
     public void reforge() {
         // 1. Pega o item que está no slot do meio
-        ItemStack itemStack = this.getSlot(1).getStack();
+        ItemStack itemStack = this.getSlot(1).getItem();
 
         // 2. Descobre qual é o Tier atual dele
-        net.minecraft.util.Identifier attrId = ModifierUtils.getAttributeId(itemStack);
+        Identifier attrId = ModifierUtils.getAttributeId(itemStack);
 
         // 🌟 TRAVA DUPLA: Bloqueia se for Único (e a config proibir) OU se for Mítico!
         if (attrId != null) {
@@ -238,7 +245,7 @@ public class ReforgeScreenHandler extends ScreenHandler {
         // 🌟 4. COBRANÇA DE XP DINÂMICA (Só cobra se passou pela trava acima)
         int xpCost = ConfigInit.CONFIG.reforgeXpCost;
         if (!this.player.isCreative()) {
-            this.player.addExperience(-xpCost); // Subtrai o valor da config
+            this.player.giveExperiencePoints(-xpCost); // Subtrai o valor da config
         }
 
         // 5. Remove o Tier antigo e rola os dados para um Tier novo
@@ -250,7 +257,16 @@ public class ReforgeScreenHandler extends ScreenHandler {
         this.decrementStack(2);
 
         // 7. Toca o som da bigorna
-        this.context.run((world, pos) -> world.syncWorldEvent(WorldEvents.ANVIL_USED, (BlockPos) pos, 0));
+        this.context.execute((world, pos) -> {
+            world.playSound(
+                    null,                    // player (null = todos escutam)
+                    pos,                     // posição do bloco
+                    SoundEvents.ANVIL_USE,   // som da bigorna
+                    SoundSource.BLOCKS,      // categoria
+                    1.0F,                    // volume
+                    1.0F                     // pitch
+            );
+        });
     }
 
     public void setPos(BlockPos pos) {
@@ -262,13 +278,14 @@ public class ReforgeScreenHandler extends ScreenHandler {
     }
 
     private void decrementStack(int slot) {
-        ItemStack itemStack = this.inventory.getStack(slot);
-        itemStack.decrement(1);
-        this.inventory.setStack(slot, itemStack);
+        ItemStack itemStack = this.inventory.getItem(slot);
+        itemStack.shrink(1);
+        this.inventory.setItem(slot, itemStack);
     }
 
     @Override
-    public boolean canInsertIntoSlot(ItemStack stack, Slot slot) {
-        return slot.inventory != this.inventory && super.canInsertIntoSlot(stack, slot);
+    public boolean canTakeItemForPickAll(ItemStack stack, Slot slot) {
+        return slot.container != this.inventory && super.canTakeItemForPickAll(stack, slot);
     }
+
 }

@@ -1,6 +1,7 @@
 package draylar.tiered;
 
 import draylar.tiered.api.*;
+import draylar.tiered.block.BlockEntities;
 import draylar.tiered.block.BlockRegisters;
 import draylar.tiered.command.CommandInit;
 import draylar.tiered.config.ConfigInit;
@@ -12,22 +13,22 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
-import net.minecraft.component.ComponentType;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.attribute.EntityAttributeModifier;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.RangedWeaponItem;
-import net.minecraft.item.ShieldItem;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.resource.ResourceType;
-import net.minecraft.resource.featuretoggle.FeatureFlags;
-import net.minecraft.screen.ScreenHandlerContext;
-import net.minecraft.screen.ScreenHandlerType;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ProjectileWeaponItem;
+import net.minecraft.world.item.ShieldItem;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Registry;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.world.flag.FeatureFlags;
+import net.minecraft.world.inventory.ContainerLevelAccess;
+import net.minecraft.world.inventory.MenuType;
+import net.minecraft.resources.Identifier;
 
+import net.minecraft.world.level.block.Block;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -42,11 +43,17 @@ public class Tiered implements ModInitializer {
 
     public static final ReforgeDataLoader REFORGE_DATA_LOADER = new ReforgeDataLoader();
 
-    public static ScreenHandlerType<ReforgeScreenHandler> REFORGE_SCREEN_HANDLER_TYPE;
+    public static MenuType<ReforgeScreenHandler> REFORGE_SCREEN_HANDLER_TYPE;
 
-    public static final ComponentType<TierComponent> TIER = registerComponent("tiered:tier", builder -> builder.codec(TierComponent.CODEC).packetCodec(TierComponent.PACKET_CODEC));
+    public static final DataComponentType<TierComponent> TIER = registerComponent("tiered:tier", builder -> builder.persistent(TierComponent.CODEC).networkSynchronized(TierComponent.PACKET_CODEC));
 
     public static final Logger LOGGER = LogManager.getLogger();
+
+    public static final String MOD_ID = "tiered";
+
+    public static Identifier id(String name) {
+        return Identifier.fromNamespaceAndPath(MOD_ID, name);
+    }
 
 
     @Override
@@ -56,15 +63,18 @@ public class Tiered implements ModInitializer {
         CustomEntityAttributes.init();
         CommandInit.init();
         BlockRegisters.registerModBlocks();
-        ResourceManagerHelper.get(ResourceType.SERVER_DATA).registerReloadListener(Tiered.ATTRIBUTE_DATA_LOADER);
-        ResourceManagerHelper.get(ResourceType.SERVER_DATA).registerReloadListener(Tiered.REFORGE_DATA_LOADER);
+        BlockEntities.init();
+
+
+        ResourceManagerHelper.get(PackType.SERVER_DATA).registerReloadListener(Tiered.ATTRIBUTE_DATA_LOADER);
+        ResourceManagerHelper.get(PackType.SERVER_DATA).registerReloadListener(Tiered.REFORGE_DATA_LOADER);
 
 
 
 
 
-        REFORGE_SCREEN_HANDLER_TYPE = Registry.register(Registries.SCREEN_HANDLER, "tiered:reforge",
-                new ScreenHandlerType<>((syncId, inventory) -> new ReforgeScreenHandler(syncId, inventory, ScreenHandlerContext.EMPTY), FeatureFlags.VANILLA_FEATURES));
+        REFORGE_SCREEN_HANDLER_TYPE = Registry.register(BuiltInRegistries.MENU, Identifier.fromNamespaceAndPath(Tiered.MOD_ID, "reforge"),
+                new MenuType<>((syncId, inventory) -> new ReforgeScreenHandler(syncId, inventory, ContainerLevelAccess.NULL), FeatureFlagSet.of()));
 
         TieredServerPacket.init();
 
@@ -76,8 +86,8 @@ public class Tiered implements ModInitializer {
 
         ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, serverResourceManager, success) -> {
             if (success) {
-                for (int i = 0; i < server.getPlayerManager().getPlayerList().size(); i++) {
-                    ModifierUtils.updateItemStackComponent(server.getPlayerManager().getPlayerList().get(i).getInventory());
+                for (int i = 0; i < server.getPlayerList().getMaxPlayers(); i++) {
+                    ModifierUtils.updateItemStackComponent(server.getPlayerList().getPlayers().get(i).getInventory());
                 }
                 LOGGER.info("Finished reload on {}", Thread.currentThread());
             } else {
@@ -92,24 +102,20 @@ public class Tiered implements ModInitializer {
 
     }
 
-    private static <T> ComponentType<T> registerComponent(String id, UnaryOperator<ComponentType.Builder<T>> builderOperator) {
-        return Registry.register(Registries.DATA_COMPONENT_TYPE, id, builderOperator.apply(ComponentType.builder()).build());
+    private static <T> DataComponentType<T> registerComponent(String id, UnaryOperator<DataComponentType.Builder<T>> builderOperator) {
+        return Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id, builderOperator.apply(DataComponentType.builder()).build());
     }
 
-
-    public static Identifier id(String path) {
-        return Identifier.of("tiered", path);
-    }
 
     public static boolean isPreferredEquipmentSlot(ItemStack stack, EquipmentSlot slot) {
         // 🌟 CORREÇÃO APLICADA AQUI:
         // Usamos o Data Component EQUIPPABLE em vez da interface Equipment
-        var equippable = stack.get(DataComponentTypes.EQUIPPABLE);
+        var equippable = stack.get(DataComponents.EQUIPPABLE);
         if (equippable != null) {
             return equippable.slot() == slot;
         }
 
-        if (stack.getItem() instanceof ShieldItem || stack.getItem() instanceof RangedWeaponItem || stack.isIn(TieredItemTags.MAIN_OFFHAND_ITEM)) {
+        if (stack.getItem() instanceof ShieldItem || stack.getItem() instanceof ProjectileWeaponItem || stack.is(TieredItemTags.MAIN_OFFHAND_ITEM)) {
             return slot == EquipmentSlot.MAINHAND || slot == EquipmentSlot.OFFHAND;
         }
 

@@ -11,29 +11,32 @@ import draylar.tiered.config.ConfigInit;
 import draylar.tiered.network.TieredClientPacket;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.ScreenTexts;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Holder;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.Items;
 
 @Environment(EnvType.CLIENT)
-public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
+public class ReforgeScreen extends AbstractContainerScreen<ReforgeScreenHandler> {
 
-    public static final Identifier TEXTURE = Identifier.of("tiered", "textures/gui/reforging_screen3.png");
-    public static final Identifier REFORGE_UNIQUE = Identifier.of("tiered", "textures/gui/reforging_unique.png");
-    public static final Identifier REFORGE_MYTHIC = Identifier.of("tiered", "textures/gui/reforging_mythic.png");
+    public static final Identifier TEXTURE = Identifier.fromNamespaceAndPath("tiered", "textures/gui/reforging_screen3.png");
+    public static final Identifier REFORGE_UNIQUE = Identifier.fromNamespaceAndPath("tiered", "textures/gui/reforging_unique.png");
+    public static final Identifier REFORGE_MYTHIC = Identifier.fromNamespaceAndPath("tiered", "textures/gui/reforging_mythic.png");
 
     public ReforgeScreen.ReforgeButton reforgeButton;
     private ItemStack last;
@@ -47,31 +50,31 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
     private boolean expectingReforge = false;
     private int lastIngredientCount = 0;
     private Identifier lastTier = null;
-    private Text floatingText = null;
+    private Component floatingText = null;
     private int floatingTick = 0;
 
-    public ReforgeScreen(ReforgeScreenHandler handler, PlayerInventory playerInventory, Text title) {
+    public ReforgeScreen(ReforgeScreenHandler handler, Inventory playerInventory, Component title) {
         super(handler, playerInventory, title);
-        this.titleX = 8;
+        this.titleLabelX = 8;
         // 🌟 UX: Abaixando o título da Forja (O padrão é 6, mudamos para 12 ou 14)
-        this.titleY = 8;
+        this.titleLabelY = 8;
 
         // 🌟 UX: Garantindo que o título do seu inventário ("Inventário") fique no lugar certo
-        this.playerInventoryTitleY = this.backgroundHeight - 94;
+        this.inventoryLabelX = 8;
     }
 
     @Override
     protected void init() {
         super.init();
-        int i = (this.width - this.backgroundWidth) / 2;
-        int j = (this.height - this.backgroundHeight) / 2;
+        int i = (this.width - this.imageWidth) / 2;
+        int j = (this.height - this.imageHeight) / 2;
 
-        this.reforgeButton = this.addDrawableChild(new ReforgeScreen.ReforgeButton(i + 79, j + 56, (button) -> {
-            if (button instanceof ReforgeScreen.ReforgeButton reforgeBtn && !reforgeBtn.disabled) {
+        this.reforgeButton = this.addRenderableWidget(new ReforgeButton(i + 79, j + 56, (button) -> {
+            if (button instanceof ReforgeButton reforgeBtn && !reforgeBtn.disabled) {
                 TieredClientPacket.writeC2SReforgePacket();
                 this.expectingReforge = true;
-                this.lastIngredientCount = this.handler.getSlot(0).getStack().getCount();
-                this.lastTier = ModifierUtils.getAttributeId(this.handler.getSlot(1).getStack());
+                this.lastIngredientCount = this.menu.getSlot(0).getItem().getCount();
+                this.lastTier = ModifierUtils.getAttributeId(this.menu.getSlot(1).getItem());
             }
         }));
     }
@@ -79,16 +82,16 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
     // 🌟 NOVO: Atualiza o botão a cada frame do jogo
 
     @Override
-    protected void handledScreenTick() {
-        super.handledScreenTick();
+    protected void containerTick() {
+        super.containerTick();
         if (this.reforgeButton != null) {
-            this.reforgeButton.setDisabled(!this.handler.isReforgeReady());
+            this.reforgeButton.setDisabled(!this.menu.isReforgeReady());
         }
 
         // 🌟 LÓGICA DE SUCESSO OU FALHA
         if (this.expectingReforge) {
-            ItemStack currentIngredient = this.handler.getSlot(0).getStack();
-            ItemStack currentWeapon = this.handler.getSlot(1).getStack();
+            ItemStack currentIngredient = this.menu.getSlot(0).getItem();
+            ItemStack currentWeapon = this.menu.getSlot(1).getItem();
 
             // Se a quantidade de ingredientes diminuiu, o servidor processou a reforja!
             if (currentIngredient.getCount() < this.lastIngredientCount || (this.lastIngredientCount > 0 && currentIngredient.isEmpty())) {
@@ -97,10 +100,10 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
                 // Compara o Tier novo com o Tier da "foto"
                 if (currentTier != null && !currentTier.equals(this.lastTier)) {
                     // SUCESSO! O Tier mudou.
-                    this.floatingText = Text.literal("✨ ").append(currentWeapon.getName()).append(" ✨");
+                    this.floatingText = Component.literal("✨ ").append(currentWeapon.getHoverName()).append(" ✨");
                 } else {
                     // FALHA! Gastou o item mas o Tier continuou o mesmo.
-                    this.floatingText = Text.literal("✨ ").append(currentWeapon.getName()).append(" ✨");
+                    this.floatingText = Component.literal("✨ ").append(currentWeapon.getHoverName()).append(" ✨");
                 }
 
                 this.floatingTick = 40; // Inicia a animação (2 segundos)
@@ -114,17 +117,17 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
-        this.drawMouseoverTooltip(context, mouseX, mouseY);
+        this.renderTooltip(context, mouseX, mouseY);
 
         // 🌟 DESENHA O SISTEMA DE SORTE E CHANCES (Chamada Nova)
         this.renderLuckAndChances(context, mouseX, mouseY);
 
         // Lógica do Tooltip quando passa o mouse no botão
-        if (this.isPointWithinBounds(79, 56, 18, 18, (double) mouseX, (double) mouseY)) {
-            ItemStack itemStack = this.getScreenHandler().getSlot(1).getStack();
-            List<Text> tooltip = new ArrayList<Text>();
+        if (this.isHovering(79, 56, 18, 18, (double) mouseX, (double) mouseY)) {
+            ItemStack itemStack = this.menu.getSlot(1).getItem();
+            List<Component> tooltip = new ArrayList<Component>();
 
             // Verifica se o item é Único e se a config bloqueia a reforja dele
             Identifier tierId = ModifierUtils.getAttributeId(itemStack);
@@ -133,21 +136,21 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
 
             if (itemStack.isEmpty()) {
                 // ESTADO 1: Mesa vazia
-                tooltip.add(Text.translatable("screen.tiered.reforge_insert_equipment").formatted(Formatting.YELLOW));
+                tooltip.add(Component.translatable("screen.tiered.reforge_insert_equipment").withStyle(ChatFormatting.YELLOW));
             }
-            else if (itemStack.isIn(TieredItemTags.MODIFIER_RESTRICTED)) {
+            else if (itemStack.is(TieredItemTags.MODIFIER_RESTRICTED)) {
                 // ESTADO 2: Item proibido
-                tooltip.add(Text.translatable("screen.tiered.reforge_restricted").formatted(Formatting.RED));
+                tooltip.add(Component.translatable("screen.tiered.reforge_restricted").withStyle(ChatFormatting.RED));
             }
             else if (isUniqueLocked) {
                 // 🌟 ESTADO 3: ITEM ÚNICO BLOQUEADO!
                 // Mostra uma mensagem roxa e em negrito, e ignora o resto (XP, ingredientes)
-                tooltip.add(Text.translatable("screen.tiered.reforge_unique_locked").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD));
+                tooltip.add(Component.translatable("screen.tiered.reforge_unique_locked").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD));
             }
             else if (isMythicLocked) {
                 // 🌟 ESTADO 3: ITEM MITICO BLOQUEADO!
                 // Mostra uma mensagem VERMELHA e em negrito, e ignora o resto (XP, ingredientes)
-                tooltip.add(Text.translatable("screen.tiered.reforge_mythic_locked").formatted(Formatting.AQUA, Formatting.BOLD));
+                tooltip.add(Component.translatable("screen.tiered.reforge_mythic_locked").withStyle(ChatFormatting.AQUA, ChatFormatting.BOLD));
             }
             else {
                 // ESTADO 4: Equipamento válido! Checa o que falta.
@@ -160,13 +163,13 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
                     if (!items.isEmpty()) {
                         baseItems.addAll(items);
                     } else {
-                        var repairable = itemStack.get(DataComponentTypes.REPAIRABLE);
+                        var repairable = itemStack.get(DataComponents.REPAIRABLE);
                         if (repairable != null && repairable.items() != null) {
-                            for (RegistryEntry<Item> entry : repairable.items()) {
+                            for (Holder<Item> entry : repairable.items()) {
                                 baseItems.add(entry.value());
                             }
                         } else {
-                            for (RegistryEntry<Item> itemRegistryEntry : Registries.ITEM.getOrThrow(TieredItemTags.REFORGE_BASE_ITEM)) {
+                            for (Holder<Item> itemRegistryEntry : BuiltInRegistries.ITEM.getOrThrow(TieredItemTags.REFORGE_BASE_ITEM)) {
                                 baseItems.add(itemRegistryEntry.value());
                             }
                         }
@@ -175,54 +178,55 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
 
                 // Checa Ingrediente Base
                 if (!baseItems.isEmpty()) {
-                    ItemStack ingredient = this.getScreenHandler().getSlot(0).getStack();
+                    ItemStack ingredient = this.getMenu().getSlot(0).getItem();
                     if (ingredient.isEmpty() || !baseItems.contains(ingredient.getItem())) {
-                        tooltip.add(Text.translatable("screen.tiered.reforge_ingredient").formatted(Formatting.RED));
+                        tooltip.add(Component.translatable("screen.tiered.reforge_ingredient").withStyle(ChatFormatting.RED));
                         for (Item item : baseItems) {
-                            tooltip.add(Text.literal(" - ").append(item.getName()).formatted(Formatting.GRAY));
+                            tooltip.add(Component.literal(" - ").append(item.getName()).withStyle(ChatFormatting.GRAY));
                         }
                     }
                 }
 
                 // Checa Catalisador
-                ItemStack addition = this.getScreenHandler().getSlot(2).getStack();
-                if (addition.isEmpty() || !addition.isIn(TieredItemTags.REFORGE_ADDITION)) {
-                    tooltip.add(Text.translatable("screen.tiered.reforge_addition").formatted(Formatting.RED));
+                ItemStack addition = this.getMenu().getSlot(2).getItem();
+                if (addition.isEmpty() || !addition.is(TieredItemTags.REFORGE_ADDITION)) {
+                    tooltip.add(Component.translatable("screen.tiered.reforge_addition").withStyle(ChatFormatting.RED));
                 }
 
                 // Checa Dano
-                if (itemStack.isDamageable() && itemStack.isDamaged()) {
-                    tooltip.add(Text.translatable("screen.tiered.reforge_damaged").formatted(Formatting.RED));
+                if (itemStack.isDamageableItem() && itemStack.isDamaged()) {
+                    tooltip.add(Component.translatable("screen.tiered.reforge_damaged").withStyle(ChatFormatting.RED));
                 }
 
                 // Checa XP
-                if (this.client != null && this.client.player != null) {
+                if (this.minecraft != null && this.minecraft.player != null) {
                     int xpCost = ConfigInit.CONFIG.reforgeXpCost;
-                    if (this.client.player.totalExperience < xpCost && !this.client.player.isCreative()) {
-                        tooltip.add(Text.translatable("screen.tiered.reforge_xp_missing", xpCost).formatted(Formatting.RED));
+
+                    if (this.minecraft.player.totalExperience < xpCost && !this.minecraft.player.isCreative()) {
+                        tooltip.add(Component.translatable("screen.tiered.reforge_xp_missing", xpCost).withStyle(ChatFormatting.RED));
                     } else {
-                        tooltip.add(Text.translatable("screen.tiered.reforge_xp_cost", xpCost).formatted(Formatting.GREEN));
+                        tooltip.add(Component.translatable("screen.tiered.reforge_xp_cost", xpCost).withStyle(ChatFormatting.GREEN));
                     }
                 }
             }
 
             if (!tooltip.isEmpty()) {
-                context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
+                context.setComponentTooltipForNextFrame(this.font, tooltip, mouseX, mouseY);
             }
         }
 
         // Desenha o cadeado se for único e a config não permitir
-        if (!ConfigInit.CONFIG.uniqueReforge && !this.getScreenHandler().getSlot(1).getStack().isEmpty()) {
-            Identifier attrId = ModifierUtils.getAttributeId(this.getScreenHandler().getSlot(1).getStack());
+        if (!ConfigInit.CONFIG.uniqueReforge && !this.getMenu().getSlot(1).getItem().isEmpty()) {
+            Identifier attrId = ModifierUtils.getAttributeId(this.getMenu().getSlot(1).getItem());
             if (attrId != null && attrId.getPath().contains("unique")) {
-                context.drawTexture(RenderPipelines.GUI_TEXTURED, REFORGE_UNIQUE, this.x + 75, this.y + 30, 0, 0, 26, 25, 26, 25);
+                context.blit(RenderPipelines.GUI_TEXTURED, REFORGE_UNIQUE, this.leftPos + 75, this.topPos + 30, 0, 0, 26, 25, 26, 25);
             }
         }
         // Desenha o cadeado se for Mythic e a config não permitir
-        if (!this.getScreenHandler().getSlot(1).getStack().isEmpty()) {
-            Identifier attrId = ModifierUtils.getAttributeId(this.getScreenHandler().getSlot(1).getStack());
+        if (!this.getMenu().getSlot(1).getItem().isEmpty()) {
+            Identifier attrId = ModifierUtils.getAttributeId(this.getMenu().getSlot(1).getItem());
             if (attrId != null && attrId.getPath().contains("mythic")) {
-                context.drawTexture(RenderPipelines.GUI_TEXTURED, REFORGE_MYTHIC, this.x + 75, this.y + 30, 0, 0, 26, 25, 26, 25);
+                context.blit(RenderPipelines.GUI_TEXTURED, REFORGE_MYTHIC, this.leftPos + 75, this.topPos + 30, 0, 0, 26, 25, 26, 25);
             }
         }
 
@@ -242,38 +246,39 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
             alpha = Math.max(5, Math.min(255, alpha)); // Trava entre 5 e 255
             int color = (alpha << 24) | 0xFFFFFF; // Aplica a transparência
 
-            context.getMatrices().pushMatrix();
+            context.pose().pushMatrix();
 
-            context.drawCenteredTextWithShadow(this.textRenderer, this.floatingText, textX, textY, color);
+            context.drawCenteredString(this.font, this.floatingText, textX, textY, color);
 
-            context.getMatrices().popMatrix();
+            context.pose().popMatrix();
         }
 
     }
 
 
+
     // =================================================================
     // 🌟 O SISTEMA DE SORTE E TOOLTIP DINÂMICA (Sincronizado com o Servidor)
     // =================================================================
-    private void renderLuckAndChances(DrawContext context, int mouseX, int mouseY) {
-        if (this.client == null || this.client.player == null) return;
+    private void renderLuckAndChances(GuiGraphics context, int mouseX, int mouseY) {
+        if (this.minecraft == null || this.minecraft.player == null) return;
 
-        double luck = this.client.player.getAttributeValue(net.minecraft.entity.attribute.EntityAttributes.LUCK);
+        double luck = this.minecraft.player.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.LUCK);
         String luckText = "🍀 " + PERCENT_FORMAT.format(luck);
 
-        int textX = this.x + 142;
-        int textY = this.y + 8; // Se quiser descer a sorte também, mude o 8 para 12
-        int textWidth = this.textRenderer.getWidth(luckText);
-        int textHeight = this.textRenderer.fontHeight;
+        int textX = this.leftPos + 142;
+        int textY = this.topPos + 8; // Se quiser descer a sorte também, mude o 8 para 12
+        int textWidth = this.font.width(luckText);
+        int textHeight = this.font.lineHeight;
 
         // 🌟 UX: Diminuindo o tamanho do texto da Sorte (80% do tamanho original)
         float scale = 0.7f;
 
-        context.getMatrices().pushMatrix();
-        context.getMatrices().translate(textX, textY);
-        context.getMatrices().scale(scale, scale);
-        context.drawText(this.textRenderer, luckText, 0, 0, 0xFF55FF55, true);
-        context.getMatrices().popMatrix();
+        context.pose().pushMatrix();
+        context.pose().translate(textX, textY);
+        context.pose().scale(scale, scale);
+        context.drawString(this.font, luckText, 0, 0, 0xFF55FF55, true);
+        context.pose().popMatrix();
 
         // Ajusta a área de colisão do mouse para o novo tamanho do texto
         int scaledWidth = (int) (textWidth * scale);
@@ -281,19 +286,19 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
 
         if (mouseX >= textX && mouseX <= textX + scaledWidth && mouseY >= textY && mouseY <= textY + scaledHeight) {
 
-            List<Text> tooltip = new ArrayList<>();
-            tooltip.add(Text.translatable("tiered.tooltip.reforge_chance").formatted(Formatting.GOLD, Formatting.ITALIC));
+            List<Component> tooltip = new ArrayList<>();
+            tooltip.add(Component.translatable("tiered.tooltip.reforge_chance").withStyle(ChatFormatting.GOLD, ChatFormatting.ITALIC));
 
             double reforgeMod = ConfigInit.CONFIG.reforgeModifier;
             double luckMod = ConfigInit.CONFIG.luckReforgeModifier;
 
             class DynamicTier {
                 String keyword;
-                Text name;
-                Formatting color;
+                Component name;
+                ChatFormatting color;
                 double currentTotalWeight = 0.0;
 
-                DynamicTier(String keyword, Text name, Formatting color) {
+                DynamicTier(String keyword, Component name, ChatFormatting color) {
                     this.keyword = keyword;
                     this.name = name;
                     this.color = color;
@@ -301,26 +306,26 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
             }
 
             DynamicTier[] tiers = {
-                    new DynamicTier("common", Text.translatable("tiered.tooltip.reforge_common"), Formatting.WHITE),
-                    new DynamicTier("uncommon", Text.translatable("tiered.tooltip.reforge_uncommon"), Formatting.GREEN),
-                    new DynamicTier("rare", Text.translatable("tiered.tooltip.reforge_rare"), Formatting.BLUE),
-                    new DynamicTier("epic", Text.translatable("tiered.tooltip.reforge_epic"), Formatting.DARK_PURPLE),
-                    new DynamicTier("legendary", Text.translatable("tiered.tooltip.reforge_legendary"), Formatting.GOLD),
-                    new DynamicTier("unique", Text.translatable("tiered.tooltip.reforge_unique"), Formatting.LIGHT_PURPLE),
-                    new DynamicTier("mythic", Text.translatable("tiered.tooltip.reforge_mythic"), Formatting.AQUA)
+                    new DynamicTier("common", Component.translatable("tiered.tooltip.reforge_common"), ChatFormatting.WHITE),
+                    new DynamicTier("uncommon", Component.translatable("tiered.tooltip.reforge_uncommon"), ChatFormatting.GREEN),
+                    new DynamicTier("rare", Component.translatable("tiered.tooltip.reforge_rare"), ChatFormatting.BLUE),
+                    new DynamicTier("epic", Component.translatable("tiered.tooltip.reforge_epic"), ChatFormatting.DARK_PURPLE),
+                    new DynamicTier("legendary", Component.translatable("tiered.tooltip.reforge_legendary"), ChatFormatting.GOLD),
+                    new DynamicTier("unique", Component.translatable("tiered.tooltip.reforge_unique"), ChatFormatting.LIGHT_PURPLE),
+                    new DynamicTier("mythic", Component.translatable("tiered.tooltip.reforge_mythic"), ChatFormatting.AQUA)
             };
 
             var allAttributes = draylar.tiered.Tiered.ATTRIBUTE_DATA_LOADER.getItemAttributes();
             if (allAttributes.isEmpty()) return;
 
-            net.minecraft.item.ItemStack equipmentStack = net.minecraft.item.ItemStack.EMPTY;
-            net.minecraft.item.ItemStack resultStack = net.minecraft.item.ItemStack.EMPTY;
+            net.minecraft.world.item.ItemStack equipmentStack = net.minecraft.world.item.ItemStack.EMPTY;
+            net.minecraft.world.item.ItemStack resultStack = net.minecraft.world.item.ItemStack.EMPTY;
 
             int customSlotCount = 0;
-            for (net.minecraft.screen.slot.Slot slot : this.handler.slots) {
-                if (!(slot.inventory instanceof net.minecraft.entity.player.PlayerInventory)) {
-                    if (customSlotCount == 1) equipmentStack = slot.getStack();
-                    if (customSlotCount == 2) resultStack = slot.getStack();
+            for (Slot slot : this.menu.slots) {
+                if (!(slot.container instanceof Inventory)) {
+                    if (customSlotCount == 1) equipmentStack = slot.getItem();
+                    if (customSlotCount == 2) resultStack = slot.getItem();
                     customSlotCount++;
                 }
             }
@@ -329,34 +334,34 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
                 equipmentStack = resultStack;
             }
 
-            net.minecraft.util.Identifier itemId = net.minecraft.registry.Registries.ITEM.getId(equipmentStack.getItem());
+            net.minecraft.resources.Identifier itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(equipmentStack.getItem());
             boolean hasItem = !equipmentStack.isEmpty();
 
             // 🌟 UX: Separação Cirúrgica das Armaduras
             String categoryKey = "tiered.tooltip.category.global";
 
             if (hasItem) {
-                if (equipmentStack.isIn(net.minecraft.registry.tag.ItemTags.SWORDS)) categoryKey = "tiered.tooltip.category.sword";
-                else if (equipmentStack.isIn(net.minecraft.registry.tag.ItemTags.PICKAXES)) categoryKey = "tiered.tooltip.category.pickaxe";
-                else if (equipmentStack.isIn(net.minecraft.registry.tag.ItemTags.AXES)) categoryKey = "tiered.tooltip.category.axe";
-                else if (equipmentStack.isIn(net.minecraft.registry.tag.ItemTags.SHOVELS)) categoryKey = "tiered.tooltip.category.shovel";
-                else if (equipmentStack.isIn(net.minecraft.registry.tag.ItemTags.HOES)) categoryKey = "tiered.tooltip.category.hoe";
+                if (equipmentStack.is(ItemTags.SWORDS)) categoryKey = "tiered.tooltip.category.sword";
+                else if (equipmentStack.is(ItemTags.PICKAXES)) categoryKey = "tiered.tooltip.category.pickaxe";
+                else if (equipmentStack.is(ItemTags.AXES)) categoryKey = "tiered.tooltip.category.axe";
+                else if (equipmentStack.is(ItemTags.SHOVELS)) categoryKey = "tiered.tooltip.category.shovel";
+                else if (equipmentStack.is(ItemTags.HOES)) categoryKey = "tiered.tooltip.category.hoe";
                     // Separação das peças de armadura
-                else if (equipmentStack.isIn(net.minecraft.registry.tag.ItemTags.HEAD_ARMOR)) categoryKey = "tiered.tooltip.category.helmet";
-                else if (equipmentStack.isIn(net.minecraft.registry.tag.ItemTags.CHEST_ARMOR)) categoryKey = "tiered.tooltip.category.chestplate";
-                else if (equipmentStack.isIn(net.minecraft.registry.tag.ItemTags.LEG_ARMOR)) categoryKey = "tiered.tooltip.category.leggings";
-                else if (equipmentStack.isIn(net.minecraft.registry.tag.ItemTags.FOOT_ARMOR)) categoryKey = "tiered.tooltip.category.boots";
+                else if (equipmentStack.is(ItemTags.HEAD_ARMOR)) categoryKey = "tiered.tooltip.category.helmet";
+                else if (equipmentStack.is(ItemTags.CHEST_ARMOR)) categoryKey = "tiered.tooltip.category.chestplate";
+                else if (equipmentStack.is(ItemTags.LEG_ARMOR)) categoryKey = "tiered.tooltip.category.leggings";
+                else if (equipmentStack.is(ItemTags.FOOT_ARMOR)) categoryKey = "tiered.tooltip.category.boots";
                     // Restante
-                else if (equipmentStack.isOf(net.minecraft.item.Items.BOW)) categoryKey = "tiered.tooltip.category.bow";
-                else if (equipmentStack.isOf(net.minecraft.item.Items.CROSSBOW)) categoryKey = "tiered.tooltip.category.crossbow";
-                else if (equipmentStack.isOf(net.minecraft.item.Items.SHIELD)) categoryKey = "tiered.tooltip.category.shield";
-                else if (equipmentStack.isOf(net.minecraft.item.Items.TRIDENT)) categoryKey = "tiered.tooltip.category.trident";
-                else if (equipmentStack.isOf(net.minecraft.item.Items.ELYTRA)) categoryKey = "tiered.tooltip.category.elytra";
-                else if (equipmentStack.isOf(net.minecraft.item.Items.MACE)) categoryKey = "tiered.tooltip.category.mace";
+                else if (equipmentStack.is(Items.BOW)) categoryKey = "tiered.tooltip.category.bow";
+                else if (equipmentStack.is(Items.CROSSBOW)) categoryKey = "tiered.tooltip.category.crossbow";
+                else if (equipmentStack.is(Items.SHIELD)) categoryKey = "tiered.tooltip.category.shield";
+                else if (equipmentStack.is(Items.TRIDENT)) categoryKey = "tiered.tooltip.category.trident";
+                else if (equipmentStack.is(Items.ELYTRA)) categoryKey = "tiered.tooltip.category.elytra";
+                else if (equipmentStack.is(Items.MACE)) categoryKey = "tiered.tooltip.category.mace";
                 else categoryKey = "tiered.tooltip.category.item";
             }
 
-            java.util.Map<net.minecraft.util.Identifier, draylar.tiered.api.PotentialAttribute> validAttributes = new java.util.HashMap<>();
+            java.util.Map<net.minecraft.resources.Identifier, draylar.tiered.api.PotentialAttribute> validAttributes = new java.util.HashMap<>();
             for (var entry : allAttributes.entrySet()) {
                 if (!hasItem || entry.getValue().isValid(itemId)) {
                     validAttributes.put(entry.getKey(), entry.getValue());
@@ -370,8 +375,8 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
                 }
             }
 
-            tooltip.add(Text.translatable(categoryKey).formatted(Formatting.YELLOW));
-            tooltip.add(Text.empty());
+            tooltip.add(Component.translatable(categoryKey).withStyle(ChatFormatting.YELLOW));
+            tooltip.add(Component.empty());
 
             double initialMaxWeight = 0.0;
             for (var attr : validAttributes.values()) {
@@ -380,7 +385,7 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
             }
 
             double newMaxWeight = 0.0;
-            java.util.Map<net.minecraft.util.Identifier, Double> reforgedWeights = new java.util.HashMap<>();
+            java.util.Map<net.minecraft.resources.Identifier, Double> reforgedWeights = new java.util.HashMap<>();
 
             for (var entry : validAttributes.entrySet()) {
                 double w = entry.getValue().getWeight() + 1.0;
@@ -395,7 +400,7 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
             double absoluteTotalWeight = 0.0;
 
             for (var entry : reforgedWeights.entrySet()) {
-                net.minecraft.util.Identifier id = entry.getKey();
+                net.minecraft.resources.Identifier id = entry.getKey();
                 double w = entry.getValue();
 
                 if (luck > 0) {
@@ -430,35 +435,37 @@ public class ReforgeScreen extends HandledScreen<ReforgeScreenHandler> {
                     double chance = (t.currentTotalWeight / absoluteTotalWeight) * 100.0;
                     String chanceStr = chance < 0.01 ? "< 0.01" : PERCENT_FORMAT.format(chance);
 
-                    tooltip.add(t.name.copy().append(": ").formatted(t.color)
-                            .append(Text.literal(chanceStr + "%").formatted(Formatting.GRAY)));
+                    tooltip.add(t.name.copy().append(": ").withStyle(t.color)
+                            .append(Component.literal(chanceStr + "%").withStyle(ChatFormatting.GRAY)));
                 }
             }
-            context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
+            context.setComponentTooltipForNextFrame(this.font, tooltip, mouseX, mouseY);
         }
     }
 
 
 
     @Override
-    protected void drawBackground(DrawContext context, float delta, int mouseX, int mouseY) {
-        int i = (this.width - this.backgroundWidth) / 2;
-        int j = (this.height - this.backgroundHeight) / 2;
-        context.drawTexture(RenderPipelines.GUI_TEXTURED, TEXTURE, i, j, 0, 0, this.backgroundWidth, this.backgroundHeight, this.backgroundWidth, this.backgroundHeight);
+    protected void renderBg(GuiGraphics context, float delta, int mouseX, int mouseY) {
+        int i = (this.width - this.imageWidth) / 2;
+        int j = (this.height - this.imageHeight) / 2;
+        context.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, i, j, 0, 0, this.imageWidth, this.imageHeight, this.imageWidth, this.imageHeight);
     }
 
-    public class ReforgeButton extends ButtonWidget {
+    public static class ReforgeButton extends Button {
         private boolean disabled;
 
-        private static final Identifier BUTTON_TEXTURE = Identifier.of("tiered", "textures/gui/reforging_button.png");
+        private static final Identifier BUTTON_TEXTURE = Identifier.fromNamespaceAndPath("tiered", "textures/gui/reforging_button.png");
 
-        public ReforgeButton(int x, int y, ButtonWidget.PressAction onPress) {
-            super(x, y, 18, 18, ScreenTexts.EMPTY, onPress, DEFAULT_NARRATION_SUPPLIER);
+        public ReforgeButton(int x, int y, Button.OnPress onPress) {
+            super(x, y, 18, 18, CommonComponents.EMPTY, onPress, DEFAULT_NARRATION);
             this.disabled = true;
             this.active = false; // Diz pro Vanilla que não pode ser clicado
         }
+
+
 @Override
-protected void drawIcon(DrawContext context, int mouseX, int mouseY, float deltaTicks) {
+protected void renderContents(GuiGraphics context, int mouseX, int mouseY, float deltaTicks) {
             int u = 0; // Posição X na imagem (sempre 0, pois a imagem tem 20px de largura)
             int v = 0; // Posição Y na imagem (muda dependendo do estado)
 
@@ -469,13 +476,14 @@ protected void drawIcon(DrawContext context, int mouseX, int mouseY, float delta
             } else {
                 u = 1;  // Pega o 1º botão (Normal/Liberado)
             }
-            context.drawTexture(RenderPipelines.GUI_TEXTURED, BUTTON_TEXTURE, this.getX(), this.getY(), u, 1, this.width, this.height, this.width, this.height,60,20);
+            context.blit(RenderPipelines.GUI_TEXTURED, BUTTON_TEXTURE, this.getX(), this.getY(), u, 1, this.width, this.height, this.width, this.height,60,20);
         }
 
         public void setDisabled(boolean disable) {
             this.disabled = disable;
             this.active = !disable;
         }
+
 
     }
 

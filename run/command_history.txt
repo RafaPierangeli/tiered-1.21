@@ -1,50 +1,13 @@
 /gamemode survival
-/experience add Player735 50000
-/gamemode creative
-/gamemode survival
 /gamemode creative
 /gamemode survival
 /gamemode creative
 /gamemode survival
 /gamemode creative
 /time set day
+/gamemode survival
+/gamemode creative
 /weather clear
 /gamemode survival
-/gamemode creative
-/gamemode survival
-/gamemode creative
-/reload
-/gamemode survival
 /time set day
-/gamemode creative
-/gamemode survival
-/gamemode creative
-/time set day
-/gamemode survival
-/gamemode creative
-/gamemode survival
-/gamemode creative
-/gamemode survival
-/time set day
-/gamemode creative
-/reload
-/gamemode survival
-/gamemode creative
-/gamemode survival
-/gamemode creative
-/gamemode survival
-/gamemode creative
-/time set day
-/weather clear
-/gamemode survival
-/gamemode creative
-/gamemode survival
-/gamemode creative
-/gamemode survival
-/gamemode creative
-/gamemode survival
-/gamemode creative
-/gamemode survival
-/gamemode creative
-/gamemode survival
 /gamemode creative

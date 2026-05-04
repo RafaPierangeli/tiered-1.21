@@ -7,65 +7,69 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
+import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
+import net.minecraft.util.profiling.ProfilerFiller;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
-import net.minecraft.item.Item;
-import net.minecraft.registry.Registries;
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.Item;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.NonNull;
 
-public class ReforgeDataLoader implements SimpleSynchronousResourceReloadListener {
+public class ReforgeDataLoader extends SimplePreparableReloadListener implements IdentifiableResourceReloadListener {
 
     private static final Logger LOGGER = LogManager.getLogger("TieredZ");
 
-    private List<Identifier> reforgeIdentifiers = new ArrayList<>();
-    private Map<Identifier, List<Item>> reforgeBaseMap = new HashMap<>();
+    private final List<Identifier> reforgeIdentifiers = new ArrayList<>();
+    private final Map<Identifier, List<Item>> reforgeBaseMap = new HashMap<>();
 
     @Override
-    public Identifier getFabricId() {
-        return Identifier.of("tiered", "reforge_loader");
+    public @NonNull Identifier getFabricId() {
+        return Identifier.fromNamespaceAndPath("tiered", "reforge_loader");
     }
 
     @Override
-    public void reload(ResourceManager resourceManager) {
+    public Object prepare(ResourceManager resourceManager, @NonNull ProfilerFiller profilerFiller) {
 
-        resourceManager.findResources("reforge_items", id -> id.getPath().endsWith(".json")).forEach((id, resourceRef) -> {
+        resourceManager.listResources("reforge_items", id -> id.getPath().endsWith(".json")).forEach((id, resourceRef) -> {
             try {
-                InputStream stream = resourceRef.getInputStream();
+                InputStream stream = resourceRef.open();
                 JsonObject data = JsonParser.parseReader(new InputStreamReader(stream)).getAsJsonObject();
 
                 for (int u = 0; u < data.getAsJsonArray("items").size(); u++) {
-                    if (Registries.ITEM.get(Identifier.of(data.getAsJsonArray("items").get(u).getAsString())).toString().equals("air")) {
+                    if (BuiltInRegistries.ITEM.get(Identifier.parse(data.getAsJsonArray("items").get(u).getAsString())).toString().equals("air")) {
                         LOGGER.info("Resource {} was not loaded cause {} is not a valid item identifier", id.toString(), data.getAsJsonArray("items").get(u).getAsString());
                         continue;
                     }
                     List<Item> baseItems = new ArrayList<Item>();
                     for (int i = 0; i < data.getAsJsonArray("base").size(); i++) {
-                        if (Registries.ITEM.get(Identifier.of(data.getAsJsonArray("base").get(i).getAsString())).toString().equals("air")) {
+                        if (BuiltInRegistries.ITEM.get(Identifier.parse(data.getAsJsonArray("base").get(i).getAsString())).toString().equals("air")) {
                             LOGGER.info("Resource {} was not loaded cause {} is not a valid item identifier", id.toString(), data.getAsJsonArray("base").get(i).getAsString());
                             continue;
                         }
-                        baseItems.add(Registries.ITEM.get(Identifier.of(data.getAsJsonArray("base").get(i).getAsString())));
+                        baseItems.add(BuiltInRegistries.ITEM.get(Identifier.parse(data.getAsJsonArray("base").get(i).getAsString())).get().value());
                     }
 
-                    reforgeIdentifiers.add(Identifier.of(data.getAsJsonArray("items").get(u).getAsString()));
-                    reforgeBaseMap.put(Identifier.of(data.getAsJsonArray("items").get(u).getAsString()), baseItems);
+                    reforgeIdentifiers.add(Identifier.parse(data.getAsJsonArray("items").get(u).getAsString()));
+                    reforgeBaseMap.put(Identifier.parse(data.getAsJsonArray("items").get(u).getAsString()), baseItems);
                 }
             } catch (Exception e) {
                 LOGGER.error("Error occurred while loading resource {}. {}", id.toString(), e.toString());
             }
         });
+        return null;
     }
 
     public List<Item> getReforgeBaseItems(Item item) {
         ArrayList<Item> list = new ArrayList<Item>();
-        if (reforgeBaseMap.containsKey(Registries.ITEM.getId(item))) {
-            return reforgeBaseMap.get(Registries.ITEM.getId(item));
+        if (reforgeBaseMap.containsKey(BuiltInRegistries.ITEM.getId(item))) {
+            return reforgeBaseMap.get(BuiltInRegistries.ITEM.getId(item));
         }
         return list;
     }
@@ -82,4 +86,9 @@ public class ReforgeDataLoader implements SimpleSynchronousResourceReloadListene
         return reforgeIdentifiers;
     }
 
+
+    @Override
+    protected void apply(Object object, ResourceManager resourceManager, ProfilerFiller profilerFiller) {
+
+    }
 }

@@ -1,20 +1,22 @@
 package draylar.tiered.network.packet;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
-public record ReforgeReadyPacket(boolean disableButton) implements CustomPayload {
+public record ReforgeReadyPacket(boolean disableButton) implements CustomPacketPayload {
 
-    public static final CustomPayload.Id<ReforgeReadyPacket> PACKET_ID = new CustomPayload.Id<>(Identifier.of("tiered", "reforge_ready_packet"));
+    public static final CustomPacketPayload.Type<ReforgeReadyPacket> PACKET_ID = new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath("tiered", "reforge_ready_packet"));
 
-    public static final PacketCodec<RegistryByteBuf, ReforgeReadyPacket> PACKET_CODEC = PacketCodec.of((value, buf) -> {
-        buf.writeBoolean(value.disableButton);
-    }, buf -> new ReforgeReadyPacket(buf.readBoolean()));
+    public static final StreamCodec<RegistryFriendlyByteBuf, ReforgeReadyPacket> PACKET_CODEC =
+            StreamCodec.of(
+                    (buf, value) -> buf.writeBoolean(value.disableButton),
+                    buf -> new ReforgeReadyPacket(buf.readBoolean())
+            );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return PACKET_ID;
     }
 

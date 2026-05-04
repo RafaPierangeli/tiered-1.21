@@ -1,6 +1,6 @@
 #Allow rendering health bars as part of the gui.
 #Default Value: true
-gui_rendering = false
+gui_rendering = true
 #Allow rendering health bars above entities in the level.
 #Default Value: true
 level_rendering = true

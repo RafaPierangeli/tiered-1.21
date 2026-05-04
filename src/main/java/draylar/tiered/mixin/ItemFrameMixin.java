@@ -1,0 +1,37 @@
+package draylar.tiered.mixin;
+
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import draylar.tiered.api.ModifierUtils;
+import draylar.tiered.config.ConfigInit;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.decoration.HangingEntity;
+import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+
+// TODO(Ravel): can not resolve target class ItemFrameEntity
+@Mixin(ItemFrame.class)
+public abstract class ItemFrameMixin extends HangingEntity {
+
+    public ItemFrameMixin(EntityType<? extends HangingEntity> entityType, Level world) {
+        super(entityType, world);
+    }
+
+
+    // TODO(Ravel): no target class
+    @Inject(method = "setItem(Lnet/minecraft/world/item/ItemStack;Z)V", at = @At("HEAD"))
+    private void setHeldItemStackMixin(ItemStack stack, boolean update, CallbackInfo info) {
+
+
+        if (!this.level().isClientSide() && !update && ConfigInit.CONFIG.lootContainerModifier) {
+
+            if (!stack.isEmpty()) {
+                ModifierUtils.setItemStackAttribute(null, stack, false);
+            }
+        }
+    }
+}

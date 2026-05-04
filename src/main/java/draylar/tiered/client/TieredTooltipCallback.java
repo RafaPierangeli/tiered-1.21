@@ -1,5 +1,6 @@
 package draylar.tiered.client;
 
+import com.mojang.blaze3d.platform.Window;
 import draylar.tiered.Tiered;
 import draylar.tiered.api.PotentialAttribute;
 import draylar.tiered.config.AttributeColorMode;
@@ -8,21 +9,21 @@ import draylar.tiered.config.TooltipDisplayMode;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.AttributeModifiersComponent;
-import net.minecraft.component.type.AttributeModifierSlot;
-import net.minecraft.entity.attribute.EntityAttribute;
-import net.minecraft.entity.attribute.EntityAttributeModifier;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.text.TranslatableTextContent;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.Language;
+import net.minecraft.client.Minecraft;
+import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Holder;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.ChatFormatting;
+import net.minecraft.resources.Identifier;
+import net.minecraft.locale.Language;
 import org.lwjgl.glfw.GLFW;
 
 import java.text.DecimalFormat;
@@ -35,7 +36,7 @@ public class TieredTooltipCallback {
     public static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.##", DecimalFormatSymbols.getInstance(Locale.ROOT));
 
     private static String[] extractIconAndName(String translationKey) {
-        String rawTranslated = Language.getInstance().get(translationKey);
+        String rawTranslated = Language.getInstance().getOrDefault(translationKey);
         if (rawTranslated == null) rawTranslated = translationKey;
 
         String cleanTranslated = rawTranslated.replaceAll("§[0-9a-fk-or]", "");
@@ -61,7 +62,7 @@ public class TieredTooltipCallback {
 
             if (stack.get(Tiered.TIER) != null) {
                 String rawTierId = stack.get(Tiered.TIER).tier();
-                Identifier tierId = Identifier.of(rawTierId);
+                Identifier tierId = Identifier.parse(rawTierId);
 
                 PotentialAttribute potentialAttribute = Tiered.ATTRIBUTE_DATA_LOADER.getItemAttributes().get(tierId);
 
@@ -78,32 +79,31 @@ public class TieredTooltipCallback {
                     boolean isBetterCombatLoaded = net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("bettercombat");
 
                     if (displayMode == TooltipDisplayMode.ON_SHIFT) {
-                        net.minecraft.client.util.Window window = MinecraftClient.getInstance().getWindow();
+                        Window window = Minecraft.getInstance().getWindow();
 
-                        boolean isShiftDown = InputUtil.isKeyPressed(window, GLFW.GLFW_KEY_LEFT_SHIFT) ||
-                                InputUtil.isKeyPressed(window, GLFW.GLFW_KEY_RIGHT_SHIFT);
-                        boolean isCtrlDown = InputUtil.isKeyPressed(window, GLFW.GLFW_KEY_LEFT_CONTROL) ||
-                                InputUtil.isKeyPressed(window, GLFW.GLFW_KEY_RIGHT_CONTROL);
+                        boolean isShiftDown = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_SHIFT) ||
+                                InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_SHIFT);
+                        boolean isCtrlDown = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_CONTROL) ||
+                                InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_CONTROL);
 
                         // Lógica de compatibilidade: Se Dynamic Tooltips estiver presente, exige CTRL. Senão, exige SHIFT.
                         boolean shouldShow = hasDynamicTooltip ? isCtrlDown : isShiftDown;
 
                         if (!shouldShow) {
-                            lines.add(Text.empty());
+                            lines.add(Component.empty());
                             if (hasDynamicTooltip) {
-                                // Lembre-se de adicionar "tiered.tooltip.press_ctrl" no seu pt_br.json / en_us.json
-                                lines.add(Text.translatable("tiered.tooltip.press_ctrl").formatted(Formatting.DARK_GRAY));
+                                lines.add(Component.translatable("tiered.tooltip.press_ctrl").withStyle(ChatFormatting.DARK_GRAY));
                             } else {
-                                lines.add(Text.translatable("tiered.tooltip.press_shift").formatted(Formatting.DARK_GRAY));
+                                lines.add(Component.translatable("tiered.tooltip.press_shift").withStyle(ChatFormatting.DARK_GRAY));
                             }
                             return;
                         }
                     }
 
                     // 1. Preservar Nome, Lore e Encantamentos (Agora roda sempre, independente do Dynamic Tooltips)
-                    List<Text> preservedLines = new ArrayList<>();
-                    for (Text line : lines) {
-                        if (line.getContent() instanceof TranslatableTextContent translatable) {
+                    List<Component> preservedLines = new ArrayList<>();
+                    for (Component line : lines) {
+                        if (line.getContents() instanceof TranslatableContents translatable) {
                             if (translatable.getKey().startsWith("item.modifiers.")) {
                                 break;
                             }
@@ -114,7 +114,7 @@ public class TieredTooltipCallback {
                     lines.addAll(preservedLines);
 
                     String attrMargin = "";
-                    AttributeModifiersComponent modifiers = stack.get(DataComponentTypes.ATTRIBUTE_MODIFIERS);
+                    ItemAttributeModifiers modifiers = stack.get(DataComponents.ATTRIBUTE_MODIFIERS);
 
                     // 🌟 PASSO 1: CÁLCULO DOS TOTAIS (Matemática exata do Minecraft)
                     double baseDamage = 1.0; // Dano base do jogador com a mão vazia
@@ -130,27 +130,27 @@ public class TieredTooltipCallback {
                     double speedMultTotal = 1.0;
 
                     if (modifiers != null) {
-                        for (AttributeModifiersComponent.Entry entry : modifiers.modifiers()) {
-                            Identifier attrId = Registries.ATTRIBUTE.getId(entry.attribute().value());
+                        for (ItemAttributeModifiers.Entry entry : modifiers.modifiers()) {
+                            Identifier attrId = BuiltInRegistries.ATTRIBUTE.getKey(entry.attribute().value());
                             if (attrId != null) {
                                 String path = attrId.getPath();
-                                double val = entry.modifier().value();
-                                EntityAttributeModifier.Operation op = entry.modifier().operation();
+                                double val = entry.modifier().amount();
+                                AttributeModifier.Operation op = entry.modifier().operation();
 
                                 if (path.equals("attack_damage")) {
-                                    if (op == EntityAttributeModifier.Operation.ADD_VALUE) {
+                                    if (op == AttributeModifier.Operation.ADD_VALUE) {
                                         damageAdd += val;
-                                    } else if (op == EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE) {
+                                    } else if (op == AttributeModifier.Operation.ADD_MULTIPLIED_BASE) {
                                         damageMultBase += val;
-                                    } else if (op == EntityAttributeModifier.Operation.ADD_MULTIPLIED_TOTAL) {
+                                    } else if (op == AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL) {
                                         damageMultTotal *= (1.0 + val);
                                     }
                                 } else if (path.equals("attack_speed")) {
-                                    if (op == EntityAttributeModifier.Operation.ADD_VALUE) {
+                                    if (op == AttributeModifier.Operation.ADD_VALUE) {
                                         speedAdd += val;
-                                    } else if (op == EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE) {
+                                    } else if (op == AttributeModifier.Operation.ADD_MULTIPLIED_BASE) {
                                         speedMultBase += val;
-                                    } else if (op == EntityAttributeModifier.Operation.ADD_MULTIPLIED_TOTAL) {
+                                    } else if (op == AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL) {
                                         speedMultTotal *= (1.0 + val);
                                     }
                                 }
@@ -164,9 +164,9 @@ public class TieredTooltipCallback {
 
                     // 🌟 PASSO 2: O DISFARCE VANILLA
                     if (modifiers != null) {
-                        Map<AttributeModifierSlot, List<AttributeModifiersComponent.Entry>> vanillaModifiers = new HashMap<>();
+                        Map<EquipmentSlotGroup, List<ItemAttributeModifiers.Entry>> vanillaModifiers = new HashMap<>();
 
-                        for (AttributeModifiersComponent.Entry entry : modifiers.modifiers()) {
+                        for (ItemAttributeModifiers.Entry entry : modifiers.modifiers()) {
                             if (!entry.modifier().id().getNamespace().equals("tiered")) {
                                 vanillaModifiers.computeIfAbsent(entry.slot(), k -> new ArrayList<>()).add(entry);
                             }
@@ -174,56 +174,56 @@ public class TieredTooltipCallback {
 
                         boolean isFirstVanillaGroup = true;
 
-                        for (Map.Entry<AttributeModifierSlot, List<AttributeModifiersComponent.Entry>> group : vanillaModifiers.entrySet()) {
+                        for (Map.Entry<EquipmentSlotGroup, List<ItemAttributeModifiers.Entry>> group : vanillaModifiers.entrySet()) {
 
                             if (!isFirstVanillaGroup) {
-                                lines.add(Text.empty());
+                                lines.add(Component.empty());
                             }
                             isFirstVanillaGroup = false;
 
-                            lines.add(Text.translatable("item.modifiers." + group.getKey().asString()).formatted(Formatting.GRAY));
+                            lines.add(Component.translatable("item.modifiers." + group.getKey().getSerializedName()).withStyle(ChatFormatting.GRAY));
 
-                            for (AttributeModifiersComponent.Entry entry : group.getValue()) {
-                                EntityAttributeModifier modifier = entry.modifier();
-                                RegistryEntry<EntityAttribute> attributeEntry = entry.attribute();
+                            for (ItemAttributeModifiers.Entry entry : group.getValue()) {
+                                AttributeModifier modifier = entry.modifier();
+                                Holder<Attribute> attributeEntry = entry.attribute();
 
-                                boolean isDamage = modifier.id().equals(Identifier.ofVanilla("base_attack_damage"));
-                                boolean isSpeed = modifier.id().equals(Identifier.ofVanilla("base_attack_speed"));
+                                boolean isDamage = modifier.id().equals(Identifier.parse("base_attack_damage"));
+                                boolean isSpeed = modifier.id().equals(Identifier.parse("base_attack_speed"));
 
-                                String translationKey = attributeEntry.value().getTranslationKey();
+                                String translationKey = attributeEntry.value().getDescriptionId();
 
                                 String[] iconAndName = extractIconAndName(translationKey);
                                 String icon = iconAndName[0];
                                 String cleanName = iconAndName[1];
 
                                 // Cria a linha base
-                                MutableText finalLine = Text.literal(attrMargin);
+                                MutableComponent finalLine = Component.literal(attrMargin);
 
                                 // Adiciona o ícone com Formatting.WHITE para não herdar cores e manter a cor da imagem
                                 if (!icon.isEmpty()) {
-                                    finalLine.append(Text.literal(icon + " ").formatted(Formatting.WHITE));
+                                    finalLine.append(Component.literal(icon + " ").withStyle(ChatFormatting.WHITE));
                                 }
 
                                 // Cria o corpo do texto (Valor + Nome) separadamente
-                                MutableText body;
+                                MutableComponent body;
                                 if (isDamage) {
-                                    body = Text.translatable("attribute.modifier.equals.0", DECIMAL_FORMAT.format(totalDamage), Text.literal(cleanName));
-                                    body.formatted(Formatting.DARK_GREEN);
+                                    body = Component.translatable("attribute.modifier.equals.0", DECIMAL_FORMAT.format(totalDamage), Component.literal(cleanName));
+                                    body.withStyle(ChatFormatting.DARK_GREEN);
                                 } else if (isSpeed) {
-                                    body = Text.translatable("attribute.modifier.equals.0", DECIMAL_FORMAT.format(totalSpeed), Text.literal(cleanName));
-                                    body.formatted(Formatting.DARK_GREEN);
+                                    body = Component.translatable("attribute.modifier.equals.0", DECIMAL_FORMAT.format(totalSpeed), Component.literal(cleanName));
+                                    body.withStyle(ChatFormatting.DARK_GREEN);
                                 } else {
-                                    double value = modifier.value();
-                                    if (modifier.operation() == EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE ||
-                                            modifier.operation() == EntityAttributeModifier.Operation.ADD_MULTIPLIED_TOTAL) {
+                                    double value = modifier.amount();
+                                    if (modifier.operation() == AttributeModifier.Operation.ADD_MULTIPLIED_BASE ||
+                                            modifier.operation() == AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL) {
                                         value = value * 100.0;
                                     }
                                     boolean isPositive = value > 0;
-                                    String opId = String.valueOf(modifier.operation().getId());
+                                    String opId = String.valueOf(modifier.operation().id());
                                     String plusOrTake = isPositive ? "plus" : "take";
 
-                                    body = Text.translatable("attribute.modifier." + plusOrTake + "." + opId, DECIMAL_FORMAT.format(Math.abs(value)), Text.literal(cleanName));
-                                    body.formatted(isPositive ? Formatting.BLUE : Formatting.RED);
+                                    body = Component.translatable("attribute.modifier." + plusOrTake + "." + opId, DECIMAL_FORMAT.format(Math.abs(value)), Component.literal(cleanName));
+                                    body.withStyle(isPositive ? ChatFormatting.BLUE : ChatFormatting.RED);
                                 }
 
                                 // Junta o corpo colorido ao ícone neutro
@@ -236,38 +236,38 @@ public class TieredTooltipCallback {
                         boolean addedHeader = false;
                         Set<Identifier> drawnModifiers = new HashSet<>();
 
-                        for (AttributeModifiersComponent.Entry entry : modifiers.modifiers()) {
-                            EntityAttributeModifier modifier = entry.modifier();
+                        for (ItemAttributeModifiers.Entry entry : modifiers.modifiers()) {
+                            AttributeModifier modifier = entry.modifier();
                             Identifier modId = modifier.id();
-                            RegistryEntry<EntityAttribute> attributeEntry = entry.attribute();
+                            Holder<Attribute> attributeEntry = entry.attribute();
 
                             if (modId.getNamespace().equals("tiered") && !drawnModifiers.contains(modId)) {
 
                                 if (!addedHeader) {
-                                    lines.add(Text.empty());
-                                    lines.add(Text.literal(" ").append(Text.translatable("tiered.tooltip.tier_attributes")).formatted(Formatting.GRAY));
+                                    lines.add(Component.empty());
+                                    lines.add(Component.literal(" ").append(Component.translatable("tiered.tooltip.tier_attributes")).withStyle(ChatFormatting.GRAY));
                                     addedHeader = true;
                                 }
 
-                                Identifier attrId = Registries.ATTRIBUTE.getId(attributeEntry.value());
-                                boolean isPercentageAttribute = attrId != null && (attrId.equals(Identifier.of("tiered", "critical_chance")));
+                                Identifier attrId = BuiltInRegistries.ATTRIBUTE.getKey(attributeEntry.value());
+                                boolean isPercentageAttribute = attrId != null && (attrId.equals(Identifier.fromNamespaceAndPath("tiered", "critical_chance")));
 
-                                double value = modifier.value();
+                                double value = modifier.amount();
 
-                                if (isPercentageAttribute && modifier.operation() == EntityAttributeModifier.Operation.ADD_VALUE) {
+                                if (isPercentageAttribute && modifier.operation() == AttributeModifier.Operation.ADD_VALUE) {
                                     value = value * 100.0;
                                 }
 
-                                if (modifier.operation() == EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE ||
-                                        modifier.operation() == EntityAttributeModifier.Operation.ADD_MULTIPLIED_TOTAL) {
+                                if (modifier.operation() == AttributeModifier.Operation.ADD_MULTIPLIED_BASE ||
+                                        modifier.operation() == AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL) {
                                     value = value * 100.0;
                                 }
 
                                 boolean isPositive = value > 0;
                                 String sign = isPositive ? "+" : "";
-                                String percent = (isPercentageAttribute || modifier.operation() != EntityAttributeModifier.Operation.ADD_VALUE) ? "%" : "";
+                                String percent = (isPercentageAttribute || modifier.operation() != AttributeModifier.Operation.ADD_VALUE) ? "%" : "";
 
-                                String translationKey = attributeEntry.value().getTranslationKey();
+                                String translationKey = attributeEntry.value().getDescriptionId();
                                 if (isBetterCombatLoaded && attrId != null && attrId.getPath().equals("entity_interaction_range")) {
                                     translationKey = "attribute.name.generic.attack_range";
                                 }
@@ -277,32 +277,32 @@ public class TieredTooltipCallback {
                                 String cleanName = iconAndName[1];
 
                                 // Cria a linha base
-                                MutableText finalLine = Text.literal(attrMargin);
+                                MutableComponent finalLine = Component.literal(attrMargin);
 
                                 // Adiciona o ícone com Formatting.WHITE
                                 if (!icon.isEmpty()) {
-                                    finalLine.append(Text.literal(icon + " ").formatted(Formatting.WHITE));
+                                    finalLine.append(Component.literal(icon + " ").withStyle(ChatFormatting.WHITE));
                                 }
 
                                 // Cria o texto do atributo separadamente para receber a cor do Tier
-                                MutableText attributeText = Text.literal(sign + DECIMAL_FORMAT.format(value) + percent + " ")
-                                        .append(Text.literal(cleanName));
+                                MutableComponent attributeText = Component.literal(sign + DECIMAL_FORMAT.format(value) + percent + " ")
+                                        .append(Component.literal(cleanName));
 
                                 AttributeColorMode mode = ConfigInit.CONFIG.attributeColorMode;
                                 if (mode == AttributeColorMode.TIER_COLOR) {
                                     if (isPositive) {
                                         attributeText.setStyle(potentialAttribute.getStyle());
                                     } else {
-                                        attributeText.formatted(Formatting.RED);
+                                        attributeText.withStyle(ChatFormatting.RED);
                                     }
                                 } else {
-                                    Formatting color;
+                                    ChatFormatting color;
                                     if (mode == AttributeColorMode.GREEN_RED) {
-                                        color = isPositive ? Formatting.GREEN : Formatting.RED;
+                                        color = isPositive ? ChatFormatting.GREEN : ChatFormatting.RED;
                                     } else {
-                                        color = isPositive ? Formatting.BLUE : Formatting.RED;
+                                        color = isPositive ? ChatFormatting.BLUE : ChatFormatting.RED;
                                     }
-                                    attributeText.formatted(color);
+                                    attributeText.withStyle(color);
                                 }
 
                                 // Junta o texto colorido ao ícone neutro
@@ -313,32 +313,32 @@ public class TieredTooltipCallback {
                     }
 
                     // 🌟 PASSO 4: DURABILIDADE DA ARMA
-                    if (stack.isDamageable()) {
+                    if (stack.isDamageableItem()) {
                         int maxDamage = stack.getMaxDamage();
-                        int currentDamage = stack.getDamage();
+                        int currentDamage = stack.getDamageValue();
                         int remainingDamage = maxDamage - currentDamage;
 
                         double durabilityPercent = (double) remainingDamage / maxDamage;
-                        Formatting durabilityColor;
+                        ChatFormatting durabilityColor;
 
                         if (durabilityPercent <= 0.05) {
-                            durabilityColor = Formatting.DARK_RED;
+                            durabilityColor = ChatFormatting.DARK_RED;
                         } else if (durabilityPercent <= 0.10) {
-                            durabilityColor = Formatting.RED;
+                            durabilityColor = ChatFormatting.RED;
                         } else if (durabilityPercent <= 0.25) {
-                            durabilityColor = Formatting.GOLD;
+                            durabilityColor = ChatFormatting.GOLD;
                         } else if (durabilityPercent <= 0.50) {
-                            durabilityColor = Formatting.YELLOW;
+                            durabilityColor = ChatFormatting.YELLOW;
                         } else if (durabilityPercent <= 0.75) {
-                            durabilityColor = Formatting.GREEN;
+                            durabilityColor = ChatFormatting.GREEN;
                         } else {
-                            durabilityColor = Formatting.DARK_GREEN;
+                            durabilityColor = ChatFormatting.DARK_GREEN;
                         }
 
-                        lines.add(Text.empty());
-                        MutableText durabilityText = Text.literal(attrMargin)
-                                .append(Text.translatable("tiered.tooltip.durability").append(": ").formatted(Formatting.GRAY))
-                                .append(Text.literal(remainingDamage + " / " + maxDamage).formatted(durabilityColor));
+                        lines.add(Component.empty());
+                        MutableComponent durabilityText = Component.literal(attrMargin)
+                                .append(Component.translatable("tiered.tooltip.durability").append(": ").withStyle(ChatFormatting.GRAY))
+                                .append(Component.literal(remainingDamage + " / " + maxDamage).withStyle(durabilityColor));
 
                         lines.add(durabilityText);
                     }

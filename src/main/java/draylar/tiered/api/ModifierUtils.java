@@ -2,17 +2,18 @@ package draylar.tiered.api;
 
 import draylar.tiered.Tiered;
 import draylar.tiered.config.ConfigInit;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.AttributeModifierSlot;
-import net.minecraft.component.type.AttributeModifiersComponent;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.attribute.EntityAttributeModifier;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -24,18 +25,18 @@ import java.util.UUID;
 public class ModifierUtils {
 
     @Nullable
-    public static Identifier getRandomAttributeIDFor(@Nullable PlayerEntity playerEntity, Item item, boolean reforge) {
+    public static Identifier getRandomAttributeIDFor(@Nullable Player playerEntity, Item item, boolean reforge) {
         return getRandomAttributeIDFor(playerEntity, item, reforge, 0);
     }
 
     @Nullable
-    public static Identifier getRandomAttributeIDFor(@Nullable PlayerEntity playerEntity, Item item, boolean reforge, int merchantLevel) {
+    public static Identifier getRandomAttributeIDFor(@Nullable Player playerEntity, Item item, boolean reforge, int merchantLevel) {
         List<Identifier> potentialAttributes = new ArrayList<>();
         List<Integer> attributeWeights = new ArrayList<>();
         List<Identifier> fallbackAttributes = new ArrayList<>();
         List<Integer> fallbackWeights = new ArrayList<>();
 
-        Identifier itemId = Registries.ITEM.getId(item);
+        Identifier itemId = BuiltInRegistries.ITEM.getKey(item);
 
         Tiered.ATTRIBUTE_DATA_LOADER.getItemAttributes().forEach((id, attribute) -> {
             if (attribute.isValid(itemId) && (attribute.getWeight() > 0 || reforge)) {
@@ -80,7 +81,7 @@ public class ModifierUtils {
         }
 
         if (playerEntity != null) {
-            double luck = playerEntity.getAttributeValue(net.minecraft.entity.attribute.EntityAttributes.LUCK);
+            double luck = playerEntity.getAttributeValue(Attributes.LUCK);
 
             if (luck > 0) {
                 double luckMaxWeight = Collections.max(attributeWeights);
@@ -109,7 +110,7 @@ public class ModifierUtils {
         int totalWeight = attributeWeights.stream().mapToInt(Integer::intValue).sum();
         if (reforge) {
             System.out.println("=== [DEBUG FORJA] RAIO-X DOS PESOS (INT) ===");
-            double currentLuck = playerEntity != null ? playerEntity.getAttributeValue(net.minecraft.entity.attribute.EntityAttributes.LUCK) : 0.0;
+            double currentLuck = playerEntity != null ? playerEntity.getAttributeValue(Attributes.LUCK) : 0.0;
 
             System.out.println("Sorte do Jogador: " + currentLuck);
             System.out.println("Reforge Modifier (Corte da Forja): " + ConfigInit.CONFIG.reforgeModifier);
@@ -171,12 +172,12 @@ public class ModifierUtils {
         }
     }
 
-    public static void setItemStackAttribute(@Nullable PlayerEntity playerEntity, ItemStack stack, boolean reforge) {
+    public static void setItemStackAttribute(@Nullable Player playerEntity, ItemStack stack, boolean reforge) {
         setItemStackAttribute(playerEntity, stack, reforge, 0);
     }
 
-    public static void setItemStackAttribute(@Nullable PlayerEntity playerEntity, ItemStack stack, boolean reforge, int merchantLevel) {
-        if (!stack.isIn(TieredItemTags.MODIFIER_RESTRICTED)) {
+    public static void setItemStackAttribute(@Nullable Player playerEntity, ItemStack stack, boolean reforge, int merchantLevel) {
+        if (!stack.is(TieredItemTags.MODIFIER_RESTRICTED)) {
             Identifier potentialAttributeID = getRandomAttributeIDFor(playerEntity, stack.getItem(), reforge, merchantLevel);
 
             if (potentialAttributeID != null) {
@@ -196,11 +197,11 @@ public class ModifierUtils {
     // ========================================================================
 
     public static void applyARPGModifiers(ItemStack stack, PotentialAttribute tier) {
-        AttributeModifiersComponent currentModifiers = stack.getOrDefault(DataComponentTypes.ATTRIBUTE_MODIFIERS, AttributeModifiersComponent.DEFAULT);
-        AttributeModifiersComponent.Builder builder = AttributeModifiersComponent.builder();
+        ItemAttributeModifiers currentModifiers = stack.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY);
+        ItemAttributeModifiers.Builder builder = ItemAttributeModifiers.builder();
 
         // Copia os originais (Vanilla), mas DESTRÓI os antigos do nosso mod!
-        for (AttributeModifiersComponent.Entry entry : currentModifiers.modifiers()) {
+        for (ItemAttributeModifiers.Entry entry : currentModifiers.modifiers()) {
             if (!entry.modifier().id().getNamespace().equals("tiered")) {
                 builder.add(entry.attribute(), entry.modifier(), entry.slot());
             }
@@ -214,18 +215,18 @@ public class ModifierUtils {
                 List<EquipmentSlot> requiredSlots = template.getRequiredEquipmentSlots();
                 if (requiredSlots == null || requiredSlots.isEmpty()) {
                     EquipmentSlot naturalSlot;
-                    if (stack.contains(DataComponentTypes.EQUIPPABLE)) {
-                        naturalSlot = stack.get(DataComponentTypes.EQUIPPABLE).slot();
+                    if (stack.has(DataComponents.EQUIPPABLE)) {
+                        naturalSlot = stack.get(DataComponents.EQUIPPABLE).slot();
                     } else {
                         naturalSlot = EquipmentSlot.MAINHAND;
                     }
                     template.applyModifiers(naturalSlot, (attribute, modifier) -> {
-                        builder.add(attribute, modifier, AttributeModifierSlot.forEquipmentSlot(naturalSlot));
+                        builder.add(attribute, modifier, EquipmentSlotGroup.bySlot(naturalSlot));
                     });
                 } else {
                     for (EquipmentSlot slot : requiredSlots) {
                         template.applyModifiers(slot, (attribute, modifier) -> {
-                            builder.add(attribute, modifier, AttributeModifierSlot.forEquipmentSlot(slot));
+                            builder.add(attribute, modifier, EquipmentSlotGroup.bySlot(slot));
                         });
                     }
                 }
@@ -261,8 +262,8 @@ public class ModifierUtils {
         }
 
         // --- FASE 4: CRAVAR NA ESPADA ---
-        AttributeModifiersComponent finalModifiers = builder.build();
-        stack.set(DataComponentTypes.ATTRIBUTE_MODIFIERS, finalModifiers);
+        ItemAttributeModifiers finalModifiers = builder.build();
+        stack.set(DataComponents.ATTRIBUTE_MODIFIERS, finalModifiers);
 
         // =================================================================
         // 🌟 FASE 5: CAÇAR A DURABILIDADE E FAZER O RESET AUTOMÁTICO
@@ -270,22 +271,22 @@ public class ModifierUtils {
         float durableFactor = -1f;
         int operation = 0;
 
-        for (AttributeModifiersComponent.Entry entry : finalModifiers.modifiers()) {
-            if (entry.attribute().getKey().isPresent() &&
-                    entry.attribute().getKey().get().getValue().equals(Identifier.of("tiered", "durable"))) {
+        for (ItemAttributeModifiers.Entry entry : finalModifiers.modifiers()) {
+            if (entry.attribute().unwrapKey().isPresent() &&
+                    entry.attribute().unwrapKey().get().identifier().equals(Identifier.fromNamespaceAndPath("tiered", "durable"))) {
 
-                durableFactor = (float) Math.round(entry.modifier().value() * 100.0f) / 100.0f;
+                durableFactor = (float) Math.round(entry.modifier().amount() * 100.0f) / 100.0f;
                 operation = entry.modifier().operation().ordinal();
                 break;
             }
         }
 
         // 🌟 NOVA LÓGICA DE RESET E APLICAÇÃO
-        if (stack.contains(DataComponentTypes.MAX_DAMAGE)) {
+        if (stack.has(DataComponents.MAX_DAMAGE)) {
             // 1. Pega o valor original de fábrica (ex: 407)
-            int baseMaxDamage = stack.getItem().getComponents().getOrDefault(DataComponentTypes.MAX_DAMAGE, 0);
+            int baseMaxDamage = stack.getItem().components().getOrDefault(DataComponents.MAX_DAMAGE, 0);
             // 2. Pega o valor que está na espada agora antes de limpar (ex: 285)
-            int oldMaxDamage = stack.getOrDefault(DataComponentTypes.MAX_DAMAGE, baseMaxDamage);
+            int oldMaxDamage = stack.getOrDefault(DataComponents.MAX_DAMAGE, baseMaxDamage);
 
             if (baseMaxDamage > 0) {
                 // Por padrão, o novo limite será o original de fábrica (RESET)
@@ -295,27 +296,27 @@ public class ModifierUtils {
                 if (durableFactor != -1f) {
                     double calculatedMaxDamage = baseMaxDamage;
 
-                    if (operation == EntityAttributeModifier.Operation.ADD_VALUE.ordinal()) {
+                    if (operation == AttributeModifier.Operation.ADD_VALUE.ordinal()) {
                         calculatedMaxDamage += durableFactor;
-                    } else if (operation == EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE.ordinal() ||
-                            operation == EntityAttributeModifier.Operation.ADD_MULTIPLIED_TOTAL.ordinal()) {
+                    } else if (operation == AttributeModifier.Operation.ADD_MULTIPLIED_BASE.ordinal() ||
+                            operation == AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL.ordinal()) {
                         calculatedMaxDamage += (baseMaxDamage * durableFactor);
                     }
                     newMaxDamage = (int) Math.round(calculatedMaxDamage);
                 }
 
                 // 3. Injeta o valor final (seja ele o modificado ou o resetado para fábrica)
-                stack.set(DataComponentTypes.MAX_DAMAGE, newMaxDamage);
+                stack.set(DataComponents.MAX_DAMAGE, newMaxDamage);
 
                 // 4. Ajuste proporcional da barrinha de dano (para a espada não quebrar do nada)
-                if (stack.contains(DataComponentTypes.DAMAGE)) {
-                    int currentDamage = stack.getOrDefault(DataComponentTypes.DAMAGE, 0);
+                if (stack.has(DataComponents.DAMAGE)) {
+                    int currentDamage = stack.getOrDefault(DataComponents.DAMAGE, 0);
                     if (currentDamage > 0 && oldMaxDamage > 0) {
                         // Descobre a % de dano que a espada tinha (ex: estava 50% quebrada)
                         double damagePercent = (double) currentDamage / oldMaxDamage;
                         // Aplica os mesmos 50% de dano no novo limite
                         int newCurrentDamage = (int) Math.round(newMaxDamage * damagePercent);
-                        stack.set(DataComponentTypes.DAMAGE, newCurrentDamage);
+                        stack.set(DataComponents.DAMAGE, newCurrentDamage);
                     }
                 }
             }
@@ -329,7 +330,7 @@ public class ModifierUtils {
 
 
     // 🌟 A MUDANÇA: Adicionamos o 'ItemStack stack' aqui no começo!
-    private static void rollAndApplyPool(ItemStack stack, AttributeModifiersComponent.Builder builder, List<PotentialAttribute.AttributeRoll> pool, int count, Random random, String tierId, List<Identifier> alreadyUsedAttributes) {
+    private static void rollAndApplyPool(ItemStack stack, ItemAttributeModifiers.Builder builder, List<PotentialAttribute.AttributeRoll> pool, int count, Random random, String tierId, List<Identifier> alreadyUsedAttributes) {
         if (pool == null || pool.isEmpty() || count <= 0) return;
 
         List<PotentialAttribute.AttributeRoll> availablePool = new ArrayList<>(pool);
@@ -367,7 +368,7 @@ public class ModifierUtils {
                 }
             }
 
-            var attributeEntry = Registries.ATTRIBUTE.getEntry(roll.type());
+            var attributeEntry = BuiltInRegistries.ATTRIBUTE.get(roll.type());
             if (attributeEntry.isPresent()) {
 
                 // =====================================================================
@@ -376,8 +377,8 @@ public class ModifierUtils {
                 EquipmentSlot naturalSlot = EquipmentSlot.MAINHAND; // Padrão para itens que não se vestem
 
                 // Na nova engine, nós lemos o slot diretamente do Data Component do item!
-                if (stack.contains(DataComponentTypes.EQUIPPABLE)) {
-                    naturalSlot = stack.get(DataComponentTypes.EQUIPPABLE).slot();
+                if (stack.has(DataComponents.EQUIPPABLE)) {
+                    naturalSlot = stack.get(DataComponents.EQUIPPABLE).slot();
                 }
 
                 String attrName = roll.type().getPath();
@@ -386,25 +387,25 @@ public class ModifierUtils {
                 // Substituímos TODOS os ":" por "_" para garantir que o Identifier seja 100% válido!
                 // Ex: "tosted:meu_mod" vira "tosted_meu_mod"
                 String safeTierId = tierId.replace(":", "_");
-                Identifier modId = Identifier.of("tiered", safeTierId + "_" + attrName + "_" + naturalSlot.getName());
+                Identifier modId = Identifier.fromNamespaceAndPath("tiered", safeTierId + "_" + attrName + "_" + naturalSlot.getName());
 
 
-                EntityAttributeModifier modifier = new EntityAttributeModifier(modId, finalValue, roll.operation());
+                AttributeModifier modifier = new AttributeModifier(modId, finalValue, roll.operation());
 
                 List<EquipmentSlot> requiredSlots = roll.requiredEquipmentSlots();
 
                 if (requiredSlots == null || requiredSlots.isEmpty()) {
                     // Se o JSON não exigir nenhum slot, aplica no slot natural do item!
-                    builder.add(attributeEntry.get(), modifier, AttributeModifierSlot.forEquipmentSlot(naturalSlot));
+                    builder.add(attributeEntry.get(), modifier, EquipmentSlotGroup.bySlot(naturalSlot));
                 } else {
                     // Se o JSON tiver uma lista (ex: ["head", "chest", "legs", "feet"])
                     // Nós verificamos se o slot natural do item está nessa lista.
                     if (requiredSlots.contains(naturalSlot)) {
                         // Aplica APENAS no slot correto do item! (Fim da duplicação!)
-                        builder.add(attributeEntry.get(), modifier, AttributeModifierSlot.forEquipmentSlot(naturalSlot));
+                        builder.add(attributeEntry.get(), modifier, EquipmentSlotGroup.bySlot(naturalSlot));
                     } else {
                         // Fallback: se por algum motivo o item não bater com a lista, usa o primeiro da lista
-                        builder.add(attributeEntry.get(), modifier, AttributeModifierSlot.forEquipmentSlot(requiredSlots.get(0)));
+                        builder.add(attributeEntry.get(), modifier, EquipmentSlotGroup.bySlot(requiredSlots.get(0)));
                     }
                 }
             }
@@ -421,23 +422,23 @@ public class ModifierUtils {
     public static Identifier getAttributeId(ItemStack itemStack) {
         var tierComponent = itemStack.get(Tiered.TIER);
         if (tierComponent != null) {
-            return Identifier.of(tierComponent.tier());
+            return Identifier.parse(tierComponent.tier());
         }
         return null;
     }
 
-    public static void updateItemStackComponent(PlayerInventory playerInventory) {
-        for (int u = 0; u < playerInventory.size(); u++) {
-            ItemStack itemStack = playerInventory.getStack(u);
+    public static void updateItemStackComponent(Inventory playerInventory) {
+        for (int u = 0; u < playerInventory.getContainerSize(); u++) {
+            ItemStack itemStack = playerInventory.getItem(u);
 
             // 🌟 MODERNIZAÇÃO: Usamos contains() para verificar Data Components na 1.21.11
-            if (!itemStack.isEmpty() && itemStack.contains(Tiered.TIER)) {
-                Identifier currentTierId = Identifier.of(itemStack.get(Tiered.TIER).tier());
+            if (!itemStack.isEmpty() && itemStack.has(Tiered.TIER)) {
+                Identifier currentTierId = Identifier.parse(itemStack.get(Tiered.TIER).tier());
                 boolean isValid = false;
 
                 // Verifica se o atributo atual ainda existe na memória e se é válido para este item
                 PotentialAttribute currentAttribute = Tiered.ATTRIBUTE_DATA_LOADER.getItemAttributes().get(currentTierId);
-                if (currentAttribute != null && currentAttribute.isValid(Registries.ITEM.getId(itemStack.getItem()))) {
+                if (currentAttribute != null && currentAttribute.isValid(BuiltInRegistries.ITEM.getKey(itemStack.getItem()))) {
                     isValid = true;
                 }
 
@@ -458,8 +459,8 @@ public class ModifierUtils {
 
                             // Recalcula a durabilidade
                             for (AttributeTemplate template : newAttribute.getAttributes()) {
-                                if (template.getAttributeTypeID().equals(Identifier.of("tiered", "durable"))) {
-                                    durableFactor = (float) Math.round(template.getEntityAttributeModifier().value() * 100.0f) / 100.0f;
+                                if (template.getAttributeTypeID().equals(Identifier.fromNamespaceAndPath("tiered", "durable"))) {
+                                    durableFactor = (float) Math.round(template.getEntityAttributeModifier().amount() * 100.0f) / 100.0f;
                                     operation = template.getEntityAttributeModifier().operation().ordinal();
                                     break;
                                 }
@@ -472,7 +473,7 @@ public class ModifierUtils {
                             applyARPGModifiers(itemStack, newAttribute);
 
                             // 4. Devolve o item consertado para o inventário do jogador
-                            playerInventory.setStack(u, itemStack);
+                            playerInventory.setItem(u, itemStack);
                         }
                     }
                 }

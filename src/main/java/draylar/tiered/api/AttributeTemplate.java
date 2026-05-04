@@ -2,13 +2,13 @@ package draylar.tiered.api;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.component.type.AttributeModifierSlot;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.attribute.EntityAttribute;
-import net.minecraft.entity.attribute.EntityAttributeModifier;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
 
 import java.util.List;
 import java.util.Optional;
@@ -25,7 +25,7 @@ public class AttributeTemplate {
             Identifier.CODEC.fieldOf("type").forGetter(AttributeTemplate::getAttributeTypeID),
 
             // Lê o modificador usando o Codec NATIVO do Minecraft 1.21.11
-            EntityAttributeModifier.CODEC.fieldOf("modifier").forGetter(AttributeTemplate::getEntityAttributeModifier),
+            AttributeModifier.CODEC.fieldOf("modifier").forGetter(AttributeTemplate::getEntityAttributeModifier),
 
             // Lê os slots como Listas. Se não existirem no JSON, retorna uma lista vazia.
             EquipmentSlot.CODEC.listOf().optionalFieldOf("required_equipment_slots", List.of()).forGetter(AttributeTemplate::getRequiredEquipmentSlots),
@@ -33,11 +33,11 @@ public class AttributeTemplate {
     ).apply(instance, AttributeTemplate::new));
 
     private final Identifier attributeTypeID;
-    private final EntityAttributeModifier entityAttributeModifier;
+    private final AttributeModifier entityAttributeModifier;
     private final List<EquipmentSlot> requiredEquipmentSlots;
     private final List<EquipmentSlot> optionalEquipmentSlots;
 
-    public AttributeTemplate(Identifier attributeTypeID, EntityAttributeModifier entityAttributeModifier, List<EquipmentSlot> requiredEquipmentSlots, List<EquipmentSlot> optionalEquipmentSlots) {
+    public AttributeTemplate(Identifier attributeTypeID, AttributeModifier entityAttributeModifier, List<EquipmentSlot> requiredEquipmentSlots, List<EquipmentSlot> optionalEquipmentSlots) {
         this.attributeTypeID = attributeTypeID;
         this.entityAttributeModifier = entityAttributeModifier;
         this.requiredEquipmentSlots = requiredEquipmentSlots;
@@ -52,7 +52,7 @@ public class AttributeTemplate {
         return optionalEquipmentSlots;
     }
 
-    public EntityAttributeModifier getEntityAttributeModifier() {
+    public AttributeModifier getEntityAttributeModifier() {
         return entityAttributeModifier;
     }
 
@@ -61,23 +61,23 @@ public class AttributeTemplate {
     }
 
 
-    public void applyModifiers(EquipmentSlot slot, BiConsumer<RegistryEntry<EntityAttribute>, EntityAttributeModifier> attributeConsumer) {
+    public void applyModifiers(EquipmentSlot slot, BiConsumer<Holder<Attribute>, AttributeModifier> attributeConsumer) {
         // 🔍 A MÁGICA DA COMPATIBILIDADE: Procura o atributo no Registro Global.
         // Se o mod de Estamina estiver instalado, ele acha. Se não, ele pula.
-        Optional<RegistryEntry.Reference<EntityAttribute>> optional = Registries.ATTRIBUTE.getEntry(this.attributeTypeID);
+        Optional<Holder.Reference<Attribute>> optional = BuiltInRegistries.ATTRIBUTE.get(this.attributeTypeID);
 
         if (optional.isPresent()) {
             // Na 1.21.11, o ID do modificador é um Identifier.
             // Pegamos o ID original e anexamos o nome do slot no final do "path".
             Identifier originalId = entityAttributeModifier.id();
-            Identifier newId = Identifier.of("tiered", originalId.getNamespace() + "_" + originalId.getPath() + "_" + slot.getName());
+            Identifier newId = Identifier.fromNamespaceAndPath("tiered", originalId.getNamespace() + "_" + originalId.getPath() + "_" + slot.getName());
 
             // Cria o clone com o novo ID, mantendo o valor e a operação originais
-            EntityAttributeModifier cloneModifier = new EntityAttributeModifier(newId, entityAttributeModifier.value(), entityAttributeModifier.operation());
+            AttributeModifier cloneModifier = new AttributeModifier(newId, entityAttributeModifier.amount(), entityAttributeModifier.operation());
 
             // Verifica se o slot é válido para este modificador na 1.21.11
-            AttributeModifierSlot modSlot = AttributeModifierSlot.forEquipmentSlot(slot);
-            if (modSlot.matches(slot)) {
+            EquipmentSlotGroup modSlot = EquipmentSlotGroup.bySlot(slot);
+            if (modSlot.test(slot)) {
                 attributeConsumer.accept(optional.get(), cloneModifier);
             }
         }

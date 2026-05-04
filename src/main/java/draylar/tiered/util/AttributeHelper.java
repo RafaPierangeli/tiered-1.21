@@ -1,15 +1,15 @@
 package draylar.tiered.util;
 
 import draylar.tiered.api.CustomEntityAttributes; // Ajuste se o seu se chamar TieredAttributes
-import net.minecraft.entity.attribute.EntityAttributeInstance;
-import net.minecraft.entity.attribute.EntityAttributeModifier;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.player.Player;
 
 public class AttributeHelper {
 
     // 🌟 1. CHANCE DE CRÍTICO (Agora de 0 a 100%)
-    public static boolean shouldMeeleCrit(PlayerEntity playerEntity) {
-        EntityAttributeInstance instance = playerEntity.getAttributeInstance(CustomEntityAttributes.CRIT_CHANCE);
+    public static boolean shouldMeeleCrit(Player playerEntity) {
+        AttributeInstance instance = playerEntity.getAttribute(CustomEntityAttributes.CRIT_CHANCE);
         if (instance != null) {
             double critChance = instance.getValue();
             return playerEntity.getRandom().nextDouble() < critChance;
@@ -18,9 +18,9 @@ public class AttributeHelper {
     }
 
     // 🌟 2. DANO CRÍTICO (Adeus gambiarra, olá atributo novo!)
-    public static float getExtraCritDamage(PlayerEntity playerEntity, float oldDamage) {
+    public static float getExtraCritDamage(Player playerEntity, float oldDamage) {
         // Agora usamos o SEU novo atributo de Dano Crítico!
-        EntityAttributeInstance instance = playerEntity.getAttributeInstance(CustomEntityAttributes.CRITICAL_DAMAGE);
+        AttributeInstance instance = playerEntity.getAttribute(CustomEntityAttributes.CRITICAL_DAMAGE);
         if (instance != null) {
 
             float bonusMultiplier = (float) instance.getValue();
@@ -31,14 +31,14 @@ public class AttributeHelper {
     }
 
     // 🌟 3. VELOCIDADE DE MINERAÇÃO (Mantido o cálculo original para não quebrar compatibilidade)
-    public static float getExtraDigSpeed(PlayerEntity playerEntity, float oldDigSpeed) {
-        EntityAttributeInstance instance = playerEntity.getAttributeInstance(CustomEntityAttributes.DIG_SPEED);
+    public static float getExtraDigSpeed(Player playerEntity, float oldDigSpeed) {
+        AttributeInstance instance = playerEntity.getAttribute(CustomEntityAttributes.DIG_SPEED);
         if (instance != null) {
             float extraDigSpeed = oldDigSpeed;
-            for (EntityAttributeModifier modifier : instance.getModifiers()) {
-                float amount = (float) modifier.value();
+            for (AttributeModifier modifier : instance.getModifiers()) {
+                float amount = (float) modifier.amount();
 
-                if (modifier.operation() == EntityAttributeModifier.Operation.ADD_VALUE) {
+                if (modifier.operation() == AttributeModifier.Operation.ADD_VALUE) {
                     extraDigSpeed += amount;
                 } else {
                     extraDigSpeed *= (amount + 1);
@@ -50,14 +50,14 @@ public class AttributeHelper {
     }
 
     // 🌟 4. DANO À DISTÂNCIA (Arcos/Bestas)
-    public static float getExtraRangeDamage(PlayerEntity playerEntity, float oldDamage) {
-        EntityAttributeInstance instance = playerEntity.getAttributeInstance(CustomEntityAttributes.RANGE_ATTACK_DAMAGE);
+    public static float getExtraRangeDamage(Player playerEntity, float oldDamage) {
+        AttributeInstance instance = playerEntity.getAttribute(CustomEntityAttributes.RANGE_ATTACK_DAMAGE);
         if (instance != null) {
             float rangeDamage = oldDamage;
-            for (EntityAttributeModifier modifier : instance.getModifiers()) {
-                float amount = (float) modifier.value();
+            for (AttributeModifier modifier : instance.getModifiers()) {
+                float amount = (float) modifier.amount();
 
-                if (modifier.operation() == EntityAttributeModifier.Operation.ADD_VALUE) {
+                if (modifier.operation() == AttributeModifier.Operation.ADD_VALUE) {
                     rangeDamage += amount;
                 } else {
                     rangeDamage *= (amount + 1.0f);

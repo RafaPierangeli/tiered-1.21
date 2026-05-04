@@ -1,25 +1,35 @@
 package draylar.tiered.network.packet;
 
+import java.util.ArrayList;
 import java.util.List;
 
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.NonNull;
 
-public record AttributePacket(List<String> attributeIds, List<String> attributeJsons) implements CustomPayload {
+public record AttributePacket(List<String> attributeIds, List<String> attributeJsons) implements CustomPacketPayload {
 
-    public static final CustomPayload.Id<AttributePacket> PACKET_ID = new CustomPayload.Id<>(Identifier.of("tiered", "attribute_packet"));
+    public static final CustomPacketPayload.Type<AttributePacket> PACKET_ID = new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath("tiered", "attribute_packet"));
 
-    public static final PacketCodec<RegistryByteBuf, AttributePacket> PACKET_CODEC = PacketCodec.of((value, buf) -> {
-        buf.writeCollection(value.attributeIds, PacketByteBuf::writeString);
-        buf.writeCollection(value.attributeJsons, PacketByteBuf::writeString);
-    }, buf -> new AttributePacket(buf.readList(PacketByteBuf::readString), buf.readList(PacketByteBuf::readString)));
+    public static final StreamCodec<RegistryFriendlyByteBuf, AttributePacket> PACKET_CODEC =
+            StreamCodec.of(
+                    (buf, value) -> {
+                        buf.writeCollection(value.attributeIds, FriendlyByteBuf::writeUtf);
+                        buf.writeCollection(value.attributeJsons, FriendlyByteBuf::writeUtf);
+                    },
+                    buf -> new AttributePacket(
+                            buf.readCollection(ArrayList::new, FriendlyByteBuf::readUtf),
+                            buf.readCollection(ArrayList::new, FriendlyByteBuf::readUtf)
+                    )
+            );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public @NonNull Type<? extends CustomPacketPayload> type() {
         return PACKET_ID;
     }
+
 
 }

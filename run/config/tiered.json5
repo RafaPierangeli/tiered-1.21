@@ -18,13 +18,8 @@
 	"luckReforgeModifier": 0.019999999552965164,
 	"reforgeXpCost": 50,
 	"uniqueReforge": false,
-	"showReforgingTab": true,
-	"xIconPosition": 0,
-	"yIconPosition": 0,
-	"tieredTooltip": true,
-	"centerName": true,
 	// Color mode for attributes in tooltip
-	"attributeColorMode": "TIER_COLOR",
+	"attributeColorMode": "DEFAULT",
 	// Draws a solid colored line around the tooltip based on the tier's rarity color.
 	"enableTierColorBorder": true,
 	// Draws custom textures (corners and top icon) around the tooltip

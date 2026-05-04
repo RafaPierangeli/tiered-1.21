@@ -18,9 +18,9 @@ import draylar.tiered.reforge.ReforgeScreen;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.item.Item;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.Item;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 
 @Environment(EnvType.CLIENT)
 public class TieredClientPacket {
@@ -30,7 +30,7 @@ public class TieredClientPacket {
         ClientPlayNetworking.registerGlobalReceiver(ReforgeReadyPacket.PACKET_ID, (payload, context) -> {
             boolean disableButton = payload.disableButton();
             context.client().execute(() -> {
-                if (context.client().currentScreen instanceof ReforgeScreen reforgeScreen) {
+                if (context.client().screen instanceof ReforgeScreen reforgeScreen) {
                     reforgeScreen.reforgeButton.setDisabled(disableButton);
                 }
             });
@@ -56,7 +56,7 @@ public class TieredClientPacket {
                     List<Item> items = new ArrayList<Item>();
 
                     for (int u = count; u < (count + listSize.get(i)); u++) {
-                        items.add(Registries.ITEM.get(itemIds.get(u)));
+                        items.add(BuiltInRegistries.ITEM.get(itemIds.get(u)).get().value());
                     }
                     count += listSize.get(i);
                     Tiered.REFORGE_DATA_LOADER.putReforgeBaseItems(identifiers.get(i), items);
@@ -71,7 +71,7 @@ public class TieredClientPacket {
 
             // Para cada par id/atributo, carrega usando o novo CODEC
             for (int i = 0; i < payload.attributeIds().size(); i++) {
-                Identifier id = Identifier.of(payload.attributeIds().get(i));
+                Identifier id = Identifier.parse(payload.attributeIds().get(i));
                 String jsonString = payload.attributeJsons().get(i);
 
                 try {
