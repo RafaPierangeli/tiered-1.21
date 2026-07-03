@@ -1,5 +1,7 @@
 package draylar.tiered.mixin;
 
+import net.minecraft.client.gui.screen.ingame.SmithingScreen;
+import net.minecraft.screen.SmithingScreenHandler;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -25,17 +27,20 @@ public class ItemMixin {
         World world = player.getEntityWorld();
 
         if (!world.isClient() && !stack.isEmpty() && ConfigInit.CONFIG.craftingModifier) {
+            if (player.currentScreenHandler instanceof SmithingScreenHandler) {
+                return;
+            }
             ModifierUtils.setItemStackAttribute(player, stack, false);
         }
     }
 
     // Os outros métodos continuam intactos, pois não sofreram alterações na 1.21.11
-    @Inject(method = "onCraft", at = @At("TAIL"))
-    private void onCraftMixin(ItemStack stack, World world, CallbackInfo info) {
-        if (!world.isClient() && !stack.isEmpty() && ConfigInit.CONFIG.craftingModifier) {
-            ModifierUtils.setItemStackAttribute(null, stack, false);
-        }
-    }
+//    @Inject(method = "onCraft", at = @At("TAIL"))
+//    private void onCraftMixin(ItemStack stack, World world, CallbackInfo info) {
+//        if (!world.isClient() && !stack.isEmpty() && ConfigInit.CONFIG.craftingModifier) {
+//            ModifierUtils.setItemStackAttribute(null, stack, false);
+//        }
+//    }
 
     @Inject(method = "getItemBarStep", at = @At("HEAD"), cancellable = true)
     private void getItemBarStepMixin(ItemStack stack, CallbackInfoReturnable<Integer> info) {
