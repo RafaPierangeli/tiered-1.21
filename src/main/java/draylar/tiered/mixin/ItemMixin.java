@@ -1,5 +1,6 @@
 package draylar.tiered.mixin;
 
+import net.minecraft.world.inventory.SmithingMenu;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -27,18 +28,21 @@ public class ItemMixin {
         Level world = player.level();
 
         if (!world.isClientSide() && !stack.isEmpty() && ConfigInit.CONFIG.craftingModifier) {
+            if (player.containerMenu instanceof SmithingMenu) {
+                return;
+            }
             ModifierUtils.setItemStackAttribute(player, stack, false);
         }
     }
 
 
 // Os outros métodos continuam intactos, pois não sofreram alterações na 1.21.11
-    @Inject(method = "onCraftedPostProcess", at = @At("TAIL"))
-    private void onCraftMixin(ItemStack stack, Level world, CallbackInfo info) {
-        if (!world.isClientSide() && !stack.isEmpty() && ConfigInit.CONFIG.craftingModifier) {
-            ModifierUtils.setItemStackAttribute(null, stack, false);
-        }
-    }
+//    @Inject(method = "onCraftedPostProcess", at = @At("TAIL"))
+//    private void onCraftMixin(ItemStack stack, Level world, CallbackInfo info) {
+//        if (!world.isClientSide() && !stack.isEmpty() && ConfigInit.CONFIG.craftingModifier) {
+//            //ModifierUtils.setItemStackAttribute(null, stack, false);
+//        }
+//    }
 
 
     @Inject(method = "getBarWidth", at = @At("HEAD"), cancellable = true)

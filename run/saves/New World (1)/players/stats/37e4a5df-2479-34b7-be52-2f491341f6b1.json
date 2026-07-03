@@ -1,0 +1,17 @@
+{
+  "stats": {
+    "minecraft:custom": {
+      "minecraft:interact_with_smithing_table": 2,
+      "minecraft:time_since_rest": 1387,
+      "minecraft:total_world_time": 1431,
+      "minecraft:leave_game": 1,
+      "minecraft:interact_with_anvil": 1,
+      "minecraft:play_time": 1387,
+      "minecraft:time_since_death": 1387
+    },
+    "minecraft:crafted": {
+      "minecraft:iron_chestplate": 2
+    }
+  },
+  "DataVersion": 4790
+}
